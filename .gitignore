@@ -1,0 +1,14 @@
+/bin
+/public
+/test.yml
+/test
+/*.torrent
+/test*.*
+/*.log
+/tests
+*.key
+*.pub
+/tmp
+/static.go
+/dist/packages
+/dist/build
