@@ -28,6 +28,7 @@ type Group struct {
 	DeepScan             bool     `json:"deep_scan,omitempty"`
 	Directories          []*Group `json:"-"`
 	FileCount            int      `json:"file_count"`
+	Icon                 string   `json:"icon,omitempty"`
 	compiledIgnoreList   *util.GitIgnore
 }
 
