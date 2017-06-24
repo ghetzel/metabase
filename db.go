@@ -39,6 +39,7 @@ var CleanupIterations = 256
 type GroupListFunc func() ([]Group, error)
 type PreInitializeFunc func(db *DB) error
 type PostInitializeFunc func(db *DB, backend backends.Backend) error
+type PostScanFunc func()
 
 type DB struct {
 	BaseDirectory      string             `json:"base_dir"`
@@ -55,6 +56,7 @@ type DB struct {
 	PostInitialize     PostInitializeFunc `json:"-"`
 	db                 backends.Backend
 	models             map[string]mapper.Mapper
+	postscanCallbacks  []PostScanFunc
 }
 
 var Instance *DB
@@ -140,6 +142,10 @@ func (self *DB) UnregisterModel(name string) {
 	if _, ok := self.models[name]; ok {
 		delete(self.models, name)
 	}
+}
+
+func (self *DB) RegisterPostScanEvent(fn PostScanFunc) {
+	self.postscanCallbacks = append(self.postscanCallbacks, fn)
 }
 
 // Initialize the DB by opening the underlying database
@@ -246,6 +252,10 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 		defer func() {
 			self.Cleanup()
 			self.ScanInProgress = false
+
+			for _, fn := range self.postscanCallbacks {
+				fn()
+			}
 		}()
 	}
 
