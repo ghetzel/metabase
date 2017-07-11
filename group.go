@@ -17,18 +17,18 @@ import (
 )
 
 type Group struct {
-	ID                   string   `json:"id"`
-	Path                 string   `json:"path"`
-	Parent               string   `json:"parent"`
-	RootPath             string   `json:"-"`
-	FilePattern          string   `json:"file_pattern,omitempty"`
-	NoRecurseDirectories bool     `json:"no_recurse"`
-	FollowSymlinks       bool     `json:"follow_symlinks"`
-	FileMinimumSize      int      `json:"min_file_size,omitempty"`
-	DeepScan             bool     `json:"deep_scan,omitempty"`
-	Directories          []*Group `json:"-"`
-	FileCount            int      `json:"file_count"`
-	Icon                 string   `json:"icon,omitempty"`
+	ID                   string                 `json:"id"`
+	Path                 string                 `json:"path"`
+	Parent               string                 `json:"parent"`
+	RootPath             string                 `json:"-"`
+	FilePattern          string                 `json:"file_pattern,omitempty"`
+	NoRecurseDirectories bool                   `json:"no_recurse"`
+	FollowSymlinks       bool                   `json:"follow_symlinks"`
+	FileMinimumSize      int                    `json:"min_file_size,omitempty"`
+	DeepScan             bool                   `json:"deep_scan,omitempty"`
+	Directories          []*Group               `json:"-"`
+	FileCount            int                    `json:"file_count"`
+	Properties           map[string]interface{} `json:"properties,omitempty"`
 	compiledIgnoreList   *util.GitIgnore
 }
 
