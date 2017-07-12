@@ -3,6 +3,7 @@ package metadata
 import (
 	"encoding/xml"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"strings"
@@ -18,7 +19,7 @@ type nfoActor struct {
 }
 
 type nfoTvShow struct {
-	XMLName   struct{}   `xml:"tvshow"`
+	XMLName   xml.Name   `xml:"tvshow"`
 	Title     string     `xml:"title"`
 	Actors    []nfoActor `xml:"actor,omitempty"`
 	Genres    []string   `xml:"genre,omitempty"`
@@ -30,7 +31,7 @@ type nfoTvShow struct {
 }
 
 type nfoEpisodeDetails struct {
-	XMLName        struct{}   `xml:"episodedetails"`
+	XMLName        xml.Name   `xml:"episodedetails"`
 	Title          string     `xml:"title"`
 	Actors         []nfoActor `xml:"actor,omitempty"`
 	Aired          string     `xml:"aired,omitempty"`
@@ -49,7 +50,7 @@ type nfoEpisodeDetails struct {
 }
 
 type nfoMovieDetails struct {
-	XMLName       struct{}   `xml:"movie"`
+	XMLName       xml.Name   `xml:"movie"`
 	Title         string     `xml:"title"`
 	Actors        []nfoActor `xml:"actor,omitempty"`
 	Genres        []string   `xml:"genre,omitempty"`
@@ -91,6 +92,10 @@ func (self *MediaLoader) getNfoPath(name string) string {
 	dir, base := path.Split(name)
 	ext := path.Ext(base)
 
+	if base == `tvshow.nfo` {
+		return name
+	}
+
 	if ext != `.nfo` {
 		return path.Join(dir, strings.TrimSuffix(base, ext)+`.nfo`)
 	}
@@ -100,50 +105,75 @@ func (self *MediaLoader) getNfoPath(name string) string {
 
 func (self *MediaLoader) parseMediaInfoFile(name string) (map[string]interface{}, error) {
 	if file, err := os.Open(name); err == nil {
-		decoder := xml.NewDecoder(file)
-		rv := make(map[string]interface{})
+		if data, err := ioutil.ReadAll(file); err == nil {
+			rv := make(map[string]interface{})
 
-		// try episodedetails
-		// ----------------------------------------------------------------------------------------
-		ep := nfoEpisodeDetails{}
-		var st *structs.Struct
+			// try episodedetails
+			// ----------------------------------------------------------------------------------------
+			ep := nfoEpisodeDetails{}
+			var st *structs.Struct
 
-		if err := decoder.Decode(&ep); err == nil && ep.Title != `` {
-			rv[`type`] = `episode`
-			st = structs.New(ep)
-		}
+			if err := xml.Unmarshal(data, &ep); err == nil {
+				if ep.Title != `` {
+					// include the parent tvshow details (if available)
+					if showfile := path.Join(path.Dir(name), `tvshow.nfo`); showfile != name {
+						if tvshow, err := self.parseMediaInfoFile(showfile); err == nil {
+							if info, ok := tvshow[`media`]; ok {
+								rv[`show`] = info
+							}
+						}
+					}
 
-		// try movie
-		// ----------------------------------------------------------------------------------------
-		movie := nfoMovieDetails{}
-
-		if err := decoder.Decode(&movie); err == nil && movie.Title != `` {
-			rv[`type`] = `movie`
-			st = structs.New(movie)
-		}
-
-		// try tvshow
-		// ----------------------------------------------------------------------------------------
-		show := nfoTvShow{}
-
-		if err := decoder.Decode(&show); err == nil && show.Title != `` {
-			rv[`type`] = `tvshow`
-			st = structs.New(show)
-		}
-
-		if st != nil {
-			for _, field := range st.Fields() {
-				if !field.IsZero() {
-					rv[stringutil.Underscore(field.Name())] = field.Value()
+					rv[`type`] = `episode`
+					st = structs.New(ep)
 				}
 			}
 
-			return map[string]interface{}{
-				`media`: rv,
-			}, nil
-		}
+			// try movie
+			// ----------------------------------------------------------------------------------------
+			movie := nfoMovieDetails{}
 
-		return nil, fmt.Errorf("Unrecognized MediaInfo file format at %q", name)
+			if err := xml.Unmarshal(data, &movie); err == nil {
+				if movie.Title != `` {
+					rv[`type`] = `movie`
+					st = structs.New(movie)
+				}
+			}
+
+			// try tvshow
+			// ----------------------------------------------------------------------------------------
+			show := nfoTvShow{}
+
+			if err := xml.Unmarshal(data, &show); err == nil {
+				if show.Title != `` {
+					rv[`type`] = `tvshow`
+					st = structs.New(show)
+				}
+			}
+
+			if st != nil {
+				for _, field := range st.Fields() {
+					if !field.IsZero() {
+						key := stringutil.Underscore(field.Name())
+
+						switch key {
+						case `xml_name`:
+							continue
+						default:
+							rv[key] = field.Value()
+						}
+					}
+				}
+
+				return map[string]interface{}{
+					`media`: rv,
+				}, nil
+			}
+
+			return nil, fmt.Errorf("Unrecognized MediaInfo file format at %q", name)
+		} else {
+			return nil, err
+		}
 	} else {
 		return nil, err
 	}
