@@ -11,6 +11,7 @@ func GetLoaders() []Loader {
 		&RegexLoader{},
 		&MediaLoader{},
 		&AudioLoader{},
+		&YTDLLoader{},
 	}
 }
 

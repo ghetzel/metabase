@@ -25,7 +25,7 @@ type nfoTvShow struct {
 	Genres    []string   `xml:"genre,omitempty"`
 	MPAA      string     `xml:"mpaa,omitempty"`
 	Plot      string     `xml:"plot,omitempty"`
-	Premiered string     `xml:"aired,omitempty"`
+	Premiered string     `xml:"premiered,omitempty"`
 	Rating    float64    `xml:"rating,omitempty"`
 	Studio    string     `xml:"studio,omitempty"`
 }
@@ -69,6 +69,16 @@ type MediaLoader struct {
 }
 
 func (self *MediaLoader) CanHandle(name string) Loader {
+	if stat, err := os.Stat(name); err == nil && stat.IsDir() {
+		showinfo := path.Join(name, `tvshow.nfo`)
+
+		if _, err := os.Stat(showinfo); err == nil {
+			return &MediaLoader{
+				nfoFileName: showinfo,
+			}
+		}
+	}
+
 	if nfoFileName := self.getNfoPath(name); nfoFileName != `` {
 		if _, err := os.Stat(nfoFileName); err == nil {
 			return &MediaLoader{
