@@ -6,6 +6,8 @@ type Loader interface {
 }
 
 func GetLoaders() []Loader {
+	SetupMimeTypes()
+
 	return []Loader{
 		&FileLoader{},
 		&RegexLoader{},

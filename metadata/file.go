@@ -54,6 +54,11 @@ func (self *FileLoader) LoadMetadata(name string) (map[string]interface{}, error
 				}
 
 				mimetype[`type`] = mediaType
+
+				if parts := strings.SplitN(mediaType, `/`, 2); len(parts) == 2 {
+					mimetype[`major`] = parts[0]
+					mimetype[`minor`] = parts[1]
+				}
 			}
 
 			metadata[`mime`] = mimetype
