@@ -86,44 +86,23 @@ func (self *Group) ContainsPath(absPath string, fileStats ...os.FileInfo) bool {
 		return false
 	}
 
-	// if we're following symlinks, dereference it first to make sure we can.
-	if pathutil.IsSymlink(fileStat.Mode()) {
-		if self.FollowSymlinks {
-			// verify the symlink is readabled, expanded, and ready to scan
-			if realpath, err := os.Readlink(absPath); err == nil {
-				if realAbsPath, err := filepath.Abs(path.Join(self.Path, realpath)); err == nil {
-					if realstat, err := os.Stat(realAbsPath); err == nil {
-						log.Infof("[%s] Following symbolic link %s -> %s", self.ID, absPath, realAbsPath)
-						fileStat = realstat
-					} else {
-						log.Warningf("[%s] Error reading target of symbolic link %s: %v", self.ID, realAbsPath, err)
-						return false
-					}
-				} else {
-					log.Warningf("[%s] Error following symbolic link %s: %v", self.ID, realpath, err)
-					return false
-				}
-			} else {
-				log.Warningf("[%s] Error reading symbolic link %s: %v", self.ID, fileStat.Name(), err)
+	if realstat, err := self.resolveRealStat(absPath, fileStat); err == nil {
+		fileStat = realstat
+
+		self.populateIgnoreList()
+
+		// if an ignore list is in effect for this directory, verify our file isn't in it
+		if self.compiledIgnoreList != nil {
+			if !self.compiledIgnoreList.ShouldKeep(relPath, fileStat.Mode().IsDir()) {
 				return false
 			}
-		} else {
-			log.Infof("[%s] Skipping symbolic link %s", self.ID, absPath)
-			return false
 		}
+
+		// if we just got though all that, we belong here
+		return true
+	} else {
+		return false
 	}
-
-	self.populateIgnoreList()
-
-	// if an ignore list is in effect for this directory, verify our file isn't in it
-	if self.compiledIgnoreList != nil {
-		if !self.compiledIgnoreList.ShouldKeep(relPath, fileStat.Mode().IsDir()) {
-			return false
-		}
-	}
-
-	// if we just got though all that, we belong here
-	return true
 }
 
 func (self *Group) GetLatestModifyTime() time.Time {
@@ -207,6 +186,12 @@ func (self *Group) Scan() error {
 
 func (self *Group) ScanPath(absPath string, fileStats ...os.FileInfo) error {
 	if fileStat, err := variadicStatPath(absPath, fileStats); err == nil {
+		if realstat, err := self.resolveRealStat(absPath, fileStat); err == nil {
+			fileStat = realstat
+		} else {
+			return err
+		}
+
 		relPath := strings.TrimPrefix(absPath, self.RootPath)
 		var parent string
 
@@ -479,6 +464,33 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 	})
 
 	return entry, nil
+}
+
+func (self *Group) resolveRealStat(absPath string, fileStat os.FileInfo) (os.FileInfo, error) {
+	// if we're following symlinks, dereference it first to make sure we can.
+	if pathutil.IsSymlink(fileStat.Mode()) {
+		if self.FollowSymlinks {
+			// verify the symlink is readabled, expanded, and ready to scan
+			if realpath, err := os.Readlink(absPath); err == nil {
+				if realAbsPath, err := filepath.Abs(path.Join(self.Path, realpath)); err == nil {
+					if realstat, err := os.Stat(realAbsPath); err == nil {
+						log.Infof("[%s] Following symbolic link %s -> %s", self.ID, absPath, realAbsPath)
+						return realstat, nil
+					} else {
+						return fileStat, fmt.Errorf("[%s] Error reading target of symbolic link %s: %v", self.ID, realAbsPath, err)
+					}
+				} else {
+					return fileStat, fmt.Errorf("[%s] Error following symbolic link %s: %v", self.ID, realpath, err)
+				}
+			} else {
+				return fileStat, fmt.Errorf("[%s] Error reading symbolic link %s: %v", self.ID, fileStat.Name(), err)
+			}
+		} else {
+			return fileStat, fmt.Errorf("[%s] Skipping symbolic link %s", self.ID, absPath)
+		}
+	}
+
+	return fileStat, nil
 }
 
 func reportEntryDeletionStats(parentRootGroup string, entry *Entry) {
