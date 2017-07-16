@@ -11,6 +11,7 @@ import (
 	"github.com/ghetzel/go-stockutil/pathutil"
 	"github.com/ghetzel/go-stockutil/stringutil"
 	"github.com/ghetzel/metabase/metadata"
+	"github.com/ghetzel/metabase/stats"
 	"github.com/ghetzel/pivot"
 	"github.com/ghetzel/pivot/backends"
 	"github.com/ghetzel/pivot/dal"
@@ -42,19 +43,21 @@ type PostInitializeFunc func(db *DB, backend backends.Backend) error
 type PostScanFunc func()
 
 type DB struct {
-	BaseDirectory      string             `json:"base_dir"`
-	AutomigrateModels  bool               `json:"automigrate"`
-	URI                string             `json:"uri,omitempty"`
-	MetadataURI        string             `json:"metadata_uri,omitempty"`
-	Indexer            string             `json:"indexer,omitempty"`
-	AdditionalIndexers map[string]string  `json:"additional_indexers,omitempty"`
-	GlobalExclusions   []string           `json:"global_exclusions,omitempty"`
-	ScanInProgress     bool               `json:"scan_in_progress"`
-	ExtractFields      []string           `json:"extract_fields,omitempty"`
-	SkipMigrate        bool               `json:"skip_migrate"`
-	GroupLister        GroupListFunc      `json:"-"`
-	PreInitialize      PreInitializeFunc  `json:"-"`
-	PostInitialize     PostInitializeFunc `json:"-"`
+	BaseDirectory      string                 `json:"base_dir"`
+	AutomigrateModels  bool                   `json:"automigrate"`
+	URI                string                 `json:"uri,omitempty"`
+	MetadataURI        string                 `json:"metadata_uri,omitempty"`
+	Indexer            string                 `json:"indexer,omitempty"`
+	AdditionalIndexers map[string]string      `json:"additional_indexers,omitempty"`
+	GlobalExclusions   []string               `json:"global_exclusions,omitempty"`
+	ScanInProgress     bool                   `json:"scan_in_progress"`
+	ExtractFields      []string               `json:"extract_fields,omitempty"`
+	SkipMigrate        bool                   `json:"skip_migrate"`
+	StatsDatabase      string                 `json:"stats_database"`
+	StatsTags          map[string]interface{} `json:"stats_tags"`
+	GroupLister        GroupListFunc          `json:"-"`
+	PreInitialize      PreInitializeFunc      `json:"-"`
+	PostInitialize     PostInitializeFunc     `json:"-"`
 	db                 backends.Backend
 	metadataDb         backends.Backend
 	models             map[string]mapper.Mapper
@@ -102,7 +105,8 @@ func NewDB() *DB {
 		PostInitialize: func(_ *DB, _ backends.Backend) error {
 			return nil
 		},
-		models: make(map[string]mapper.Mapper),
+		models:    make(map[string]mapper.Mapper),
+		StatsTags: make(map[string]interface{}),
 	}
 
 	db.GroupLister = func() ([]Group, error) {
@@ -175,6 +179,15 @@ func (self *DB) Initialize() error {
 	if v, err := pathutil.ExpandUser(self.BaseDirectory); err == nil {
 		self.BaseDirectory = v
 	} else {
+		return err
+	}
+
+	// setup stats
+	if self.StatsDatabase == `` {
+		stats.LocalStatsEnabled = false
+	}
+
+	if err := stats.Initialize(self.StatsDatabase, self.StatsTags); err != nil {
 		return err
 	}
 
