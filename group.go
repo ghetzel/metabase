@@ -12,6 +12,7 @@ import (
 
 	"github.com/ghetzel/go-stockutil/pathutil"
 	"github.com/ghetzel/go-stockutil/sliceutil"
+	"github.com/ghetzel/metabase/metadata"
 	"github.com/ghetzel/metabase/stats"
 	"github.com/ghetzel/metabase/util"
 )
@@ -439,10 +440,12 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 
 	// calculate checksum for entry
 	if !entry.IsGroup {
-		if sum, err := entry.GenerateChecksum(false); err == nil {
-			entry.Checksum = sum
-		} else {
-			return nil, err
+		if lg := metadata.GetLoaderGroupForPass(self.CurrentPass); self.CurrentPass <= 0 || (lg != nil && lg.Checksum) {
+			if sum, err := entry.GenerateChecksum(false); err == nil {
+				entry.Checksum = sum
+			} else {
+				return nil, err
+			}
 		}
 
 		stats.Gauge(`metabase.db.entry.bytes_scanned`, float64(entry.Size), map[string]interface{}{

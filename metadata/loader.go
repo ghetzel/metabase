@@ -10,8 +10,9 @@ type Loader interface {
 }
 
 type LoaderGroup struct {
-	Pass    int
-	Loaders []Loader
+	Pass     int
+	Checksum bool
+	Loaders  []Loader
 }
 
 type LoaderSet []LoaderGroup
@@ -44,12 +45,23 @@ func GetLoaders() LoaderSet {
 				&YTDLLoader{},
 			},
 		}, {
-			Pass: 3,
+			Pass:     3,
+			Checksum: true,
 			Loaders: []Loader{
 				&AudioLoader{},
 			},
 		},
 	}
+}
+
+func GetLoaderGroupForPass(pass int) *LoaderGroup {
+	for _, group := range GetLoaders() {
+		if group.Pass == pass {
+			return &group
+		}
+	}
+
+	return nil
 }
 
 func GetLoadersForFile(name string, pass int) []Loader {
