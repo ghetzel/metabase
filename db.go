@@ -45,6 +45,7 @@ type DB struct {
 	BaseDirectory      string             `json:"base_dir"`
 	AutomigrateModels  bool               `json:"automigrate"`
 	URI                string             `json:"uri,omitempty"`
+	MetadataURI        string             `json:"metadata_uri,omitempty"`
 	Indexer            string             `json:"indexer,omitempty"`
 	AdditionalIndexers map[string]string  `json:"additional_indexers,omitempty"`
 	GlobalExclusions   []string           `json:"global_exclusions,omitempty"`
@@ -55,6 +56,7 @@ type DB struct {
 	PreInitialize      PreInitializeFunc  `json:"-"`
 	PostInitialize     PostInitializeFunc `json:"-"`
 	db                 backends.Backend
+	metadataDb         backends.Backend
 	models             map[string]mapper.Mapper
 	postscanCallbacks  []PostScanFunc
 }
@@ -124,9 +126,17 @@ func NewDB() *DB {
 	return db
 }
 
-func (self *DB) RegisterModel(schema *dal.Collection) error {
+func (self *DB) RegisterModel(schema *dal.Collection, _db ...backends.Backend) error {
+	var db backends.Backend
+
+	if len(_db) == 0 {
+		db = self.db
+	} else {
+		db = _db[0]
+	}
+
 	if _, ok := self.models[schema.Name]; !ok {
-		self.models[schema.Name] = mapper.NewModel(self.db, schema)
+		self.models[schema.Name] = mapper.NewModel(db, schema)
 		return nil
 	} else {
 		return fmt.Errorf("A model named %q is already registered", schema.Name)
@@ -172,17 +182,33 @@ func (self *DB) Initialize() error {
 		self.URI = fmt.Sprintf("sqlite:///%s/info.db", self.BaseDirectory)
 	}
 
+	if self.MetadataURI == `` {
+		self.MetadataURI = self.URI
+	}
+
 	if db, err := pivot.NewDatabaseWithOptions(self.URI, backends.ConnectOptions{
 		Indexer:            self.Indexer,
 		AdditionalIndexers: self.AdditionalIndexers,
 	}); err == nil {
 		self.db = db
+		self.metadataDb = db
 	} else {
 		return err
 	}
 
+	if self.MetadataURI != self.URI {
+		if db, err := pivot.NewDatabaseWithOptions(self.MetadataURI, backends.ConnectOptions{
+			Indexer:            self.Indexer,
+			AdditionalIndexers: self.AdditionalIndexers,
+		}); err == nil {
+			self.metadataDb = db
+		} else {
+			return err
+		}
+	}
+
 	// now that we have a pivot Database instance, setup our local models
-	if err := self.RegisterModel(MetadataSchema); err != nil {
+	if err := self.RegisterModel(MetadataSchema, self.metadataDb); err != nil {
 		return err
 	}
 
@@ -236,6 +262,10 @@ func (self *DB) refreshRootGroupPathCache() error {
 
 func (self *DB) GetPivotDatabase() backends.Backend {
 	return self.db
+}
+
+func (self *DB) GetPivotMetadataDatabase() backends.Backend {
+	return self.metadataDb
 }
 
 func (self *DB) AddGlobalExclusions(patterns ...string) {
