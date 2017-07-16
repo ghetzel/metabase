@@ -70,14 +70,22 @@ func (self *Entry) LastModifiedTime() time.Time {
 	}
 }
 
-func (self *Entry) LoadMetadata() error {
+func (self *Entry) LoadAllMetadata() error {
+	if err := self.LoadMetadata(0); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (self *Entry) LoadMetadata(pass int) error {
 	if stat, err := os.Stat(self.InitialPath); err == nil {
 		self.info = stat
 	} else {
 		return err
 	}
 
-	for _, loader := range metadata.GetLoadersForFile(self.InitialPath) {
+	for _, loader := range metadata.GetLoadersForFile(self.InitialPath, pass) {
 		if data, err := loader.LoadMetadata(self.InitialPath); err == nil {
 			// unwrap dot-separated keys into a deeply nested map for iteration
 			if diffused, err := maputil.DiffuseMap(data, `.`); err == nil {

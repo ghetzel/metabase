@@ -27,6 +27,7 @@ type Group struct {
 	FileMinimumSize      int                    `json:"min_file_size,omitempty"`
 	DeepScan             bool                   `json:"deep_scan,omitempty"`
 	Directories          []*Group               `json:"-"`
+	CurrentPass          int                    `json:"-"`
 	FileCount            int                    `json:"file_count"`
 	Properties           map[string]interface{} `json:"properties,omitempty"`
 	compiledIgnoreList   *util.GitIgnore
@@ -166,6 +167,9 @@ func (self *Group) Scan() error {
 		return err
 	}
 
+	// reset file count for each pass
+	self.FileCount = 0
+
 	if stats, err := ioutil.ReadDir(self.Path); err == nil {
 		for _, fileStat := range stats {
 			if err := self.ScanPath(
@@ -204,7 +208,7 @@ func (self *Group) ScanPath(absPath string, fileStats ...os.FileInfo) error {
 		dirEntry := NewEntry(self.ID, self.RootPath, absPath)
 
 		if !self.ContainsPath(absPath, fileStat) {
-			log.Debugf("[%s] Ignoring entry %s", self.ID, relPath)
+			log.Debugf("PASS %d: [%s] Ignoring entry %s", self.CurrentPass, self.ID, relPath)
 			self.cleanupMissingEntriesUnderParent(dirEntry.ID, true)
 			self.cleanupMissingEntries(map[string]interface{}{`id`: dirEntry.ID}, true)
 			self.cleanupMissingEntries(map[string]interface{}{`id`: self.ID}, true)
@@ -226,10 +230,11 @@ func (self *Group) ScanPath(absPath string, fileStats ...os.FileInfo) error {
 					subdirectory.FileMinimumSize = self.FileMinimumSize
 					subdirectory.FollowSymlinks = self.FollowSymlinks
 					subdirectory.DeepScan = self.DeepScan
+					subdirectory.CurrentPass = self.CurrentPass
 					subdirectory.compiledIgnoreList = self.compiledIgnoreList
 
 					if err := subdirectory.Initialize(); err == nil {
-						log.Infof("[%s] %16s: Scanning subdirectory %s", self.ID, subdirectory.Parent, relPath)
+						log.Infof("PASS %d: [%s] %16s: Scanning subdirectory %s", self.CurrentPass, self.ID, subdirectory.Parent, relPath)
 
 						if err := subdirectory.Scan(); err == nil {
 							self.FileCount = subdirectory.FileCount
@@ -251,10 +256,10 @@ func (self *Group) ScanPath(absPath string, fileStats ...os.FileInfo) error {
 									Metadata.Delete(ids...)
 								}
 							} else {
-								log.Errorf("[%s] Failed to cleanup entries under %s: %v", self.ID, subdirectory.Parent, err)
+								log.Errorf("PASS %d: [%s] Failed to cleanup entries under %s: %v", self.CurrentPass, self.ID, subdirectory.Parent, err)
 							}
 						} else {
-							log.Errorf("[%s] Failed to cleanup entries under %s: %v", self.ID, subdirectory.Parent, err)
+							log.Errorf("PASS %d: [%s] Failed to cleanup entries under %s: %v", self.CurrentPass, self.ID, subdirectory.Parent, err)
 						}
 
 						if Metadata.Exists(dirEntry.ID) {
@@ -264,7 +269,7 @@ func (self *Group) ScanPath(absPath string, fileStats ...os.FileInfo) error {
 						if _, err := self.scanEntry(absPath, parent, true); err == nil {
 							// cleanup entries for whom we are the parent
 							if err := self.cleanupMissingEntriesUnderParent(subdirectory.Parent, false); err != nil {
-								log.Errorf("[%s] Failed to cleanup entries under %s: %v", self.ID, subdirectory.Parent, err)
+								log.Errorf("PASS %d: [%s] Failed to cleanup entries under %s: %v", self.CurrentPass, self.ID, subdirectory.Parent, err)
 							}
 						} else {
 							return err
@@ -415,7 +420,7 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 
 	// Deep Scan only from here on...
 	// --------------------------------------------------------------------------------------------
-	log.Infof("[%s] %16s: Scanning entry %s", self.ID, parent, name)
+	log.Infof("PASS %d: [%s] %16s: Scanning entry %s", self.CurrentPass, self.ID, parent, name)
 
 	entry.Parent = parent
 	entry.RootGroup = self.ID
@@ -428,7 +433,7 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 	tm := stats.NewTiming()
 
 	// load entry metadata
-	if err := entry.LoadMetadata(); err != nil {
+	if err := entry.LoadMetadata(self.CurrentPass); err != nil {
 		return nil, err
 	}
 

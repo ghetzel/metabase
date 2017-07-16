@@ -289,51 +289,62 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 		}()
 	}
 
-	if groups, err := self.GroupLister(); err == nil {
-		for _, group := range groups {
-			// update our label-to-realpath map (used by Entry.GetAbsolutePath)
-			rootGroupToPath[group.ID] = group.Path
+	passes := metadata.GetLoaders().Passes()
 
-			group.DeepScan = deep
+	if len(labels) == 0 {
+		log.Debugf("Scanning all groups in %d passes", len(passes))
+	} else {
+		log.Debugf("Scanning groups %v in %d passes", labels, len(passes))
+	}
 
-			if len(labels) > 0 {
-				skip := true
+	for _, pass := range metadata.GetLoaders().Passes() {
+		if groups, err := self.GroupLister(); err == nil {
+			for _, group := range groups {
+				// update our label-to-realpath map (used by Entry.GetAbsolutePath)
+				rootGroupToPath[group.ID] = group.Path
 
-				for _, label := range labels {
-					if group.ID == stringutil.Underscore(label) {
-						skip = false
-						break
+				group.DeepScan = deep
+				group.CurrentPass = pass
+
+				if len(labels) > 0 {
+					skip := true
+
+					for _, label := range labels {
+						if group.ID == stringutil.Underscore(label) {
+							skip = false
+							break
+						}
+					}
+
+					if skip {
+						log.Debugf("PASS %d: Skipping group %s [%s]", pass, group.Path, group.ID)
+						continue
 					}
 				}
 
-				if skip {
-					log.Debugf("Skipping group %s [%s]", group.Path, group.ID)
-					continue
-				}
-			}
+				if err := group.Initialize(); err == nil {
+					log.Debugf("PASS %d: Scanning group %s [%s]", pass, group.Path, group.ID)
 
-			if err := group.Initialize(); err == nil {
-				log.Debugf("Scanning group %s [%s]", group.Path, group.ID)
-
-				if err := group.Scan(); err == nil {
-					defer group.RefreshStats()
+					if err := group.Scan(); err == nil {
+						defer group.RefreshStats()
+					} else {
+						if len(groups) == 1 {
+							return err
+						} else {
+							log.Errorf("PASS %d: Error scanning group %q: %v", pass, group.ID, err)
+						}
+					}
 				} else {
 					if len(groups) == 1 {
 						return err
 					} else {
-						log.Errorf("Error scanning group %q: %v", group.ID, err)
+						log.Errorf("PASS %d:Error scanning group %q: %v", pass, group.ID, err)
 					}
 				}
-			} else {
-				if len(groups) == 1 {
-					return err
-				} else {
-					log.Errorf("Error scanning group %q: %v", group.ID, err)
-				}
 			}
+		} else {
+			return err
 		}
-	} else {
-		return err
 	}
 
 	return nil

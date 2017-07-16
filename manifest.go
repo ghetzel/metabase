@@ -81,7 +81,7 @@ func (self *ManifestItem) NeedsUpdate(manifest *Manifest, policy *SyncPolicy) (b
 			default:
 				// lazy load file metadata
 				if !file.metadataLoaded {
-					if err := file.LoadMetadata(); err != nil {
+					if err := file.LoadAllMetadata(); err != nil {
 						return false, err
 					}
 				}
