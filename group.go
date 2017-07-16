@@ -27,7 +27,6 @@ type Group struct {
 	FollowSymlinks       bool                   `json:"follow_symlinks"`
 	FileMinimumSize      int                    `json:"min_file_size,omitempty"`
 	DeepScan             bool                   `json:"deep_scan,omitempty"`
-	Directories          []*Group               `json:"-"`
 	CurrentPass          int                    `json:"-"`
 	FileCount            int                    `json:"file_count"`
 	Properties           map[string]interface{} `json:"properties,omitempty"`
@@ -239,7 +238,6 @@ func (self *Group) ScanPath(absPath string, fileStats ...os.FileInfo) error {
 
 						if err := subdirectory.Scan(); err == nil {
 							self.FileCount = subdirectory.FileCount
-							self.Directories = append(self.Directories, subdirectory)
 						} else {
 							return err
 						}

@@ -288,6 +288,8 @@ func (self *DB) AddGlobalExclusions(patterns ...string) {
 }
 
 func (self *DB) Scan(deep bool, labels ...string) error {
+	startedAt := time.Now()
+
 	if self.ScanInProgress {
 		log.Warningf("Another scan is already running")
 		return fmt.Errorf("Scan already running")
@@ -301,10 +303,17 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 			for _, fn := range self.postscanCallbacks {
 				fn()
 			}
+
+			log.Infof("Scan completed in %v", time.Since(startedAt))
 		}()
 	}
 
 	passes := metadata.GetLoaders().Passes()
+
+	// deep scans are just one big pass that does everything at once
+	if deep {
+		passes = []int{ 0 }
+	}
 
 	if len(labels) == 0 {
 		log.Debugf("Scanning all groups in %d passes", len(passes))
@@ -312,7 +321,7 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 		log.Debugf("Scanning groups %v in %d passes", labels, len(passes))
 	}
 
-	for _, pass := range metadata.GetLoaders().Passes() {
+	for _, pass := range passes {
 		if groups, err := self.GroupLister(); err == nil {
 			for _, group := range groups {
 				// update our label-to-realpath map (used by Entry.GetAbsolutePath)
@@ -472,7 +481,7 @@ func (self *DB) Cleanup() error {
 			}
 		}
 
-		log.Infof("DB cleanup finished, deleted %d entries.", totalRemoved)
+		log.Infof("Cleaned up %d entries.", totalRemoved)
 	} else {
 		return err
 	}
