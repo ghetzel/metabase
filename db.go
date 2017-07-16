@@ -36,6 +36,7 @@ var DefaultGlobalExclusions = []string{
 var DefaultBaseDirectory = `~/.config/metabase`
 var rootGroupToPath = make(map[string]string)
 var CleanupIterations = 256
+var SearchIndexFlushEveryNRecords = 250
 
 type GroupListFunc func() ([]Group, error)
 type PreInitializeFunc func(db *DB) error
@@ -167,6 +168,7 @@ func (self *DB) Initialize() error {
 	filter.CriteriaSeparator = `;`
 	filter.FieldTermSeparator = `=`
 	filter.QueryUnescapeValues = true
+	backends.BleveBatchFlushCount = SearchIndexFlushEveryNRecords
 
 	// reuse the "json:" struct tag for loading pivot/dal.Record into/out of structs
 	dal.RecordStructTag = `json`
