@@ -36,11 +36,15 @@ func GetLoaders() LoaderSet {
 			Loaders: []Loader{
 				&FileLoader{},
 				&RegexLoader{},
+			},
+		}, {
+			Pass: 2,
+			Loaders: []Loader{
 				&MediaLoader{},
 				&YTDLLoader{},
 			},
 		}, {
-			Pass: 2,
+			Pass: 3,
 			Loaders: []Loader{
 				&AudioLoader{},
 			},
