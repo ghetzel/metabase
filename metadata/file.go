@@ -31,6 +31,7 @@ func (self *FileLoader) LoadMetadata(name string) (map[string]interface{}, error
 			`regular`:   mode.IsRegular(),
 			`string`:    mode.String(),
 			`directory`: mode.IsDir(),
+			`hidden`:    strings.HasPrefix(stat.Name(), `.`),
 		}
 
 		for lbl, flag := range FileModeFlags {
