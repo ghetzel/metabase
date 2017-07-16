@@ -23,6 +23,7 @@ func Initialize(statsdir string, tags map[string]interface{}) error {
 
 	if StatsdHost != `` {
 		sdopts = append(sdopts, statsd.Address(StatsdHost))
+		log.Noticef("Remote statsd host is: %v", StatsdHost)
 	} else {
 		sdopts = append(sdopts, statsd.Mute(true))
 	}
