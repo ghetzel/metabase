@@ -44,11 +44,13 @@ func GetLoaders() LoaderSet {
 	return LoaderSet{
 		{
 			Pass: 1,
-		}, {
-			Pass: 2,
 			Loaders: []Loader{
 				&FileLoader{},
 				&RegexLoader{},
+			},
+		}, {
+			Pass: 2,
+			Loaders: []Loader{
 				&MediaLoader{},
 				&YTDLLoader{},
 			},
