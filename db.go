@@ -9,6 +9,7 @@ import (
 
 	"github.com/ghetzel/byteflood/util"
 	"github.com/ghetzel/go-stockutil/pathutil"
+	"github.com/ghetzel/go-stockutil/sliceutil"
 	"github.com/ghetzel/go-stockutil/stringutil"
 	"github.com/ghetzel/metabase/metadata"
 	"github.com/ghetzel/metabase/stats"
@@ -310,20 +311,21 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 
 	passes := metadata.GetLoaders().Passes()
 
-	// deep scans are just one big pass that does everything at once
-	if deep {
-		passes = []int{ 0 }
-	}
-
 	if len(labels) == 0 {
 		log.Debugf("Scanning all groups in %d passes", len(passes))
 	} else {
 		log.Debugf("Scanning groups %v in %d passes", labels, len(passes))
 	}
 
+	groupsToSkipOnNextPass := make([]string, 0)
+
 	for _, pass := range passes {
 		if groups, err := self.GroupLister(); err == nil {
 			for _, group := range groups {
+				if sliceutil.ContainsString(groupsToSkipOnNextPass, group.ID) {
+					continue
+				}
+
 				// update our label-to-realpath map (used by Entry.GetAbsolutePath)
 				rootGroupToPath[group.ID] = group.Path
 
@@ -356,6 +358,17 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 							return err
 						} else {
 							log.Errorf("PASS %d: Error scanning group %q: %v", pass, group.ID, err)
+						}
+					}
+
+					log.Debugf("PASS %d: Group %q encountered %d modified files", pass, group.ID, group.ModifiedFileCount)
+
+					if !deep {
+						if group.ModifiedFileCount == 0 {
+							if !sliceutil.ContainsString(groupsToSkipOnNextPass, group.ID) {
+								groupsToSkipOnNextPass = append(groupsToSkipOnNextPass, group.ID)
+								log.Debugf("PASS %d: Group %q will not be scanned in remaining passes", pass, group.ID)
+							}
 						}
 					}
 				} else {
@@ -419,14 +432,34 @@ func (self *DB) Cleanup() error {
 	if f, err := ParseFilter(map[string]interface{}{
 		`root_group`: fmt.Sprintf("not:%s", strings.Join(ids, `|`)),
 	}); err == nil {
-		f.Limit = -1
+		f.Limit = 0
+		f.Sort = nil
 
 		totalRemoved := 0
 		backend := Metadata.GetBackend()
 		indexer := backend.WithSearch(``)
 
+		if i, ok := backend.(backends.Indexer); ok {
+			indexer = i
+		}
+
+		log.Debugf("Cleanup: removing entries associated with deleted root groups")
+
 		if err := indexer.DeleteQuery(MetadataSchema.Name, f); err != nil {
 			log.Warningf("Remove missing root_groups failed: %v", err)
+		}
+
+		deleteFn := func(ids []interface{}) int {
+			if l := len(ids); l > 0 {
+				if err := Metadata.Delete(ids...); err == nil {
+					log.Debugf("Removed %d entries", l)
+					return l
+				} else {
+					log.Warningf("Error cleaning up database: %v", err)
+				}
+			}
+
+			return 0
 		}
 
 		cleanupFn := func() int {
@@ -435,36 +468,38 @@ func (self *DB) Cleanup() error {
 			allQuery.Fields = []string{`id`, `name`, `root_group`, `parent`}
 
 			if err := Metadata.FindFunc(allQuery, Entry{}, func(entryI interface{}, err error) {
-				if err == nil {
-					if entry, ok := entryI.(*Entry); ok {
-						// make sure the file actually exists
-						if absPath, err := entry.GetAbsolutePath(); err == nil {
-							if _, err := os.Stat(absPath); os.IsNotExist(err) {
-								entriesToDelete = append(entriesToDelete, entry.ID)
-								reportEntryDeletionStats(entry.RootGroup, entry)
-								return
-							}
-						}
+				var entry *Entry
 
-						// make sure the entry's parent exists
-						if entry.Parent != `root` && !Metadata.Exists(entry.Parent) {
+				if len(entriesToDelete) >= 1000 {
+					deleteFn(entriesToDelete)
+					entriesToDelete = nil
+				}
+
+				if e, ok := entryI.(*Entry); ok {
+					entry = e
+				}
+
+				if err == nil {
+					// make sure the file actually exists
+					if absPath, err := entry.GetAbsolutePath(); err == nil {
+						if _, err := os.Stat(absPath); os.IsNotExist(err) {
 							entriesToDelete = append(entriesToDelete, entry.ID)
 							reportEntryDeletionStats(entry.RootGroup, entry)
 							return
 						}
 					}
+
+					// make sure the entry's parent exists
+					if entry.Parent != `root` && !Metadata.Exists(entry.Parent) {
+						entriesToDelete = append(entriesToDelete, entry.ID)
+						reportEntryDeletionStats(entry.RootGroup, entry)
+						return
+					}
 				} else {
 					log.Warningf("Error cleaning up database entries: %v", err)
 				}
 			}); err == nil {
-				if l := len(entriesToDelete); l > 0 {
-					if err := Metadata.Delete(entriesToDelete...); err == nil {
-						log.Debugf("Removed %d entries", l)
-						return l
-					} else {
-						log.Warningf("Error cleaning up database: %v", err)
-					}
-				}
+				deleteFn(entriesToDelete)
 			} else {
 				log.Warningf("Failed to cleanup database: %v", err)
 			}
@@ -473,8 +508,11 @@ func (self *DB) Cleanup() error {
 		}
 
 		// cleanup until there's nothing left, an error occurs, or we've exceeded our CleanupIterations
+		log.Debugf("Cleanup: verifying existence of all files")
+
 		for i := 0; i < CleanupIterations; i++ {
 			if removed := cleanupFn(); removed > 0 {
+				log.Debugf("Cleanup pass %d: removed %d files", i, removed)
 				totalRemoved += removed
 			} else {
 				break
@@ -483,6 +521,7 @@ func (self *DB) Cleanup() error {
 
 		log.Infof("Cleaned up %d entries.", totalRemoved)
 	} else {
+		log.Errorf("Cleanup failed: %v", err)
 		return err
 	}
 

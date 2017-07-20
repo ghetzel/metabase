@@ -15,7 +15,7 @@ fmt:
 	goimports -w .
 	go vet .
 
-test: deps fmt
+test: fmt deps
 	go test .
 
 # build: fmt

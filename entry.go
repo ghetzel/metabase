@@ -100,13 +100,13 @@ func (self *Entry) LoadMetadata(pass int) error {
 
 					return nil
 				}); err != nil {
-					return err
+					log.Warningf("%T on %q: %v", loader, self.InitialPath, err)
 				}
 			} else {
 				return err
 			}
 		} else {
-			log.Warningf("Problem loading %T for file %q: %v", loader, self.InitialPath, err)
+			log.Warningf("%T on %q: %v", loader, self.InitialPath, err)
 		}
 	}
 

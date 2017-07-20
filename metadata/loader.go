@@ -28,12 +28,24 @@ func (self LoaderSet) Passes() (passes []int) {
 	return
 }
 
+func GetChecksumPass() int {
+	for _, loader := range GetLoaders() {
+		if loader.Checksum {
+			return loader.Pass
+		}
+	}
+
+	return -1
+}
+
 func GetLoaders() LoaderSet {
 	SetupMimeTypes()
 
 	return LoaderSet{
 		{
 			Pass: 1,
+		}, {
+			Pass: 2,
 			Loaders: []Loader{
 				&FileLoader{},
 				&RegexLoader{},
@@ -41,7 +53,7 @@ func GetLoaders() LoaderSet {
 				&YTDLLoader{},
 			},
 		}, {
-			Pass: 2,
+			Pass:     3,
 			Checksum: true,
 			Loaders: []Loader{
 				&AudioLoader{},

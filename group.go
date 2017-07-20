@@ -26,9 +26,11 @@ type Group struct {
 	NoRecurseDirectories bool                   `json:"no_recurse"`
 	FollowSymlinks       bool                   `json:"follow_symlinks"`
 	FileMinimumSize      int                    `json:"min_file_size,omitempty"`
-	DeepScan             bool                   `json:"deep_scan,omitempty"`
+	DeepScan             bool                   `json:"deep_scan"`
+	SkipChecksum         bool                   `json:"skip_checksum"`
 	CurrentPass          int                    `json:"-"`
 	FileCount            int                    `json:"file_count"`
+	ModifiedFileCount    int                    `json:"modified_file_count"`
 	Properties           map[string]interface{} `json:"properties,omitempty"`
 	compiledIgnoreList   *util.GitIgnore
 }
@@ -169,6 +171,7 @@ func (self *Group) Scan() error {
 
 	// reset file count for each pass
 	self.FileCount = 0
+	self.ModifiedFileCount = 0
 
 	if stats, err := ioutil.ReadDir(self.Path); err == nil {
 		for _, fileStat := range stats {
@@ -238,6 +241,7 @@ func (self *Group) ScanPath(absPath string, fileStats ...os.FileInfo) error {
 
 						if err := subdirectory.Scan(); err == nil {
 							self.FileCount = subdirectory.FileCount
+							self.ModifiedFileCount += subdirectory.ModifiedFileCount
 						} else {
 							return err
 						}
@@ -419,6 +423,8 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 
 	// Deep Scan only from here on...
 	// --------------------------------------------------------------------------------------------
+	self.ModifiedFileCount += 1
+
 	log.Infof("PASS %d: [%s] %16s: Scanning entry %s", self.CurrentPass, self.ID, parent, name)
 
 	entry.Parent = parent
@@ -436,28 +442,40 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 		return nil, err
 	}
 
-	// calculate checksum for entry
-	if !entry.IsGroup {
-		if lg := metadata.GetLoaderGroupForPass(self.CurrentPass); self.CurrentPass <= 0 || (lg != nil && lg.Checksum) {
-			if sum, err := entry.GenerateChecksum(false); err == nil {
-				entry.Checksum = sum
-			} else {
-				return nil, err
-			}
-		}
-
-		stats.Gauge(`metabase.db.entry.bytes_scanned`, float64(entry.Size), map[string]interface{}{
-			`root_group`: self.ID,
-			`directory`:  isDir,
-		})
-	}
-
 	tm.Send(`metabase.db.entry.metadata_load_time`, map[string]interface{}{
 		`root_group`: self.ID,
 		`directory`:  isDir,
 	})
 
 	tm = stats.NewTiming()
+
+	if !entry.IsGroup {
+		if !self.SkipChecksum {
+			if self.CurrentPass == 0 || self.CurrentPass == metadata.GetChecksumPass() {
+				// calculate checksum for entry
+				if sum, err := entry.GenerateChecksum(false); err == nil {
+					entry.Checksum = sum
+
+					tm.Send(`metabase.db.entry.checksum_time`, map[string]interface{}{
+						`root_group`: self.ID,
+						`directory`:  isDir,
+					})
+
+					tm = stats.NewTiming()
+
+				} else {
+					return nil, err
+				}
+			}
+		}
+
+		if self.CurrentPass <= 1 {
+			stats.Gauge(`metabase.db.entry.bytes_scanned`, float64(entry.Size), map[string]interface{}{
+				`root_group`: self.ID,
+				`directory`:  isDir,
+			})
+		}
+	}
 
 	// persist the entry record
 	if err := Metadata.CreateOrUpdate(entry.ID, entry); err != nil {
