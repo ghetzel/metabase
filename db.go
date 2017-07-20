@@ -298,7 +298,7 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 		self.ScanInProgress = true
 
 		defer func() {
-			self.Cleanup()
+			self.Cleanup(true)
 			self.ScanInProgress = false
 
 			for _, fn := range self.postscanCallbacks {
@@ -403,7 +403,7 @@ func (self *DB) GetDirectoriesByFile(filename string) []Group {
 	return nil
 }
 
-func (self *DB) Cleanup() error {
+func (self *DB) Cleanup(skipFileStats bool) error {
 	if !self.ScanInProgress {
 		self.ScanInProgress = true
 
@@ -507,15 +507,17 @@ func (self *DB) Cleanup() error {
 			return -1
 		}
 
-		// cleanup until there's nothing left, an error occurs, or we've exceeded our CleanupIterations
-		log.Debugf("Cleanup: verifying existence of all files")
+		if !skipFileStats {
+			// cleanup until there's nothing left, an error occurs, or we've exceeded our CleanupIterations
+			log.Debugf("Cleanup: verifying existence of all files")
 
-		for i := 0; i < CleanupIterations; i++ {
-			if removed := cleanupFn(); removed > 0 {
-				log.Debugf("Cleanup pass %d: removed %d files", i, removed)
-				totalRemoved += removed
-			} else {
-				break
+			for i := 0; i < CleanupIterations; i++ {
+				if removed := cleanupFn(); removed > 0 {
+					log.Debugf("Cleanup pass %d: removed %d files", i, removed)
+					totalRemoved += removed
+				} else {
+					break
+				}
 			}
 		}
 
