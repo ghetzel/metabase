@@ -29,6 +29,7 @@ type Group struct {
 	DeepScan             bool                   `json:"deep_scan"`
 	SkipChecksum         bool                   `json:"skip_checksum"`
 	CurrentPass          int                    `json:"-"`
+	PassesDone           int                    `json:"-"`
 	FileCount            int                    `json:"file_count"`
 	ModifiedFileCount    int                    `json:"modified_file_count"`
 	Properties           map[string]interface{} `json:"properties,omitempty"`
@@ -234,6 +235,7 @@ func (self *Group) ScanPath(absPath string, fileStats ...os.FileInfo) error {
 					subdirectory.FollowSymlinks = self.FollowSymlinks
 					subdirectory.DeepScan = self.DeepScan
 					subdirectory.CurrentPass = self.CurrentPass
+					subdirectory.PassesDone = self.PassesDone
 					subdirectory.compiledIgnoreList = self.compiledIgnoreList
 
 					if err := subdirectory.Initialize(); err == nil {
@@ -410,15 +412,20 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 		//   - The entry is new, or...
 		//   - The entry exists but has been modified since we last saw it
 		//
-		if !self.DeepScan {
-			var existingFile Entry
+		var existingFile Entry
 
-			if err := Metadata.Get(entry.ID, &existingFile); err == nil {
-				if entry.LastModifiedAt == existingFile.LastModifiedAt {
+		if err := Metadata.Get(entry.ID, &existingFile); err == nil {
+			if entry.LastModifiedAt == existingFile.LastModifiedAt {
+				// only actually exit if we're not doing passes or we're on the first pass
+				if self.CurrentPass == 0 || self.PassesDone == 0 {
 					return &existingFile, nil
 				}
 			}
+
+			entry.Metadata = existingFile.Metadata
 		}
+	} else if os.IsNotExist(err) {
+		return nil, err
 	}
 
 	// Deep Scan only from here on...

@@ -68,12 +68,6 @@ type DB struct {
 
 var Instance *DB
 
-type Property struct {
-	Key   string      `json:"key,identity"`
-	Value interface{} `json:"value"`
-	db    *DB
-}
-
 func ParseFilter(spec interface{}, fmtvalues ...interface{}) (filter.Filter, error) {
 	if fmt.Sprintf("%v", spec) == `all` {
 		return filter.All, nil
@@ -318,6 +312,7 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 	}
 
 	groupsToSkipOnNextPass := make([]string, 0)
+	groupPasses := make(map[string]int)
 
 	for _, pass := range passes {
 		if groups, err := self.GroupLister(); err == nil {
@@ -331,6 +326,10 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 
 				group.DeepScan = deep
 				group.CurrentPass = pass
+
+				if v, ok := groupPasses[group.ID]; ok {
+					group.PassesDone = v
+				}
 
 				if len(labels) > 0 {
 					skip := true
@@ -378,6 +377,8 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 						log.Errorf("PASS %d:Error scanning group %q: %v", pass, group.ID, err)
 					}
 				}
+
+				groupPasses[group.ID] = (group.PassesDone + 1)
 			}
 		} else {
 			return err
