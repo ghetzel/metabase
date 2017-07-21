@@ -49,13 +49,21 @@ type WalkFunc func(path string, file *Entry, err error) error // {}
 func NewEntry(rootGroup string, root string, name string) *Entry {
 	normFileName := NormalizeFileName(root, name)
 
-	return &Entry{
-		ID:           FileIdFromName(rootGroup, normFileName),
-		RootGroup:    rootGroup,
-		RelativePath: normFileName,
-		Metadata:     make(map[string]interface{}),
-		InitialPath:  name,
+	entry := &Entry{
+		ID:          FileIdFromName(rootGroup, normFileName),
+		Metadata:    make(map[string]interface{}),
+		InitialPath: name,
 	}
+
+	// if possible, load the existing metadata entry from the database
+	if Metadata != nil {
+		Metadata.Get(entry.ID, entry)
+	}
+
+	entry.RootGroup = rootGroup
+	entry.RelativePath = normFileName
+
+	return entry
 }
 
 func (self *Entry) Info() os.FileInfo {
