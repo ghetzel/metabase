@@ -50,7 +50,7 @@ type DB struct {
 	URI                string                 `json:"uri,omitempty"`
 	MetadataURI        string                 `json:"metadata_uri,omitempty"`
 	Indexer            string                 `json:"indexer,omitempty"`
-	AdditionalIndexers map[string]string      `json:"additional_indexers,omitempty"`
+	AdditionalIndexers []string               `json:"additional_indexers,omitempty"`
 	GlobalExclusions   []string               `json:"global_exclusions,omitempty"`
 	ScanInProgress     bool                   `json:"scan_in_progress"`
 	ExtractFields      []string               `json:"extract_fields,omitempty"`
@@ -94,7 +94,7 @@ func NewDB() *DB {
 		AutomigrateModels:  true,
 		BaseDirectory:      DefaultBaseDirectory,
 		GlobalExclusions:   DefaultGlobalExclusions,
-		AdditionalIndexers: make(map[string]string),
+		AdditionalIndexers: make([]string, 0),
 		PreInitialize: func(_ *DB) error {
 			return nil
 		},
