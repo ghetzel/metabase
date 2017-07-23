@@ -30,6 +30,7 @@ type Group struct {
 	SkipChecksum         bool                   `json:"skip_checksum"`
 	CurrentPass          int                    `json:"-"`
 	PassesDone           int                    `json:"-"`
+	TargetSubgroups      []string               `json:"-"`
 	FileCount            int                    `json:"file_count"`
 	ModifiedFileCount    int                    `json:"modified_file_count"`
 	Properties           map[string]interface{} `json:"properties,omitempty"`
@@ -165,7 +166,9 @@ func (self *Group) populateIgnoreList() error {
 	return nil
 }
 
-func (self *Group) Scan() error {
+func (self *Group) Scan(subgroups []string) error {
+	self.TargetSubgroups = subgroups
+
 	if err := self.populateIgnoreList(); err != nil {
 		return err
 	}
@@ -225,23 +228,30 @@ func (self *Group) ScanPath(absPath string, fileStats ...os.FileInfo) error {
 				subdirectory := new(Group)
 
 				if err := PopulateGroup(subdirectory); err == nil {
-					subdirectory.ID = self.ID
-					subdirectory.Path = absPath
-					subdirectory.Parent = dirEntry.ID
-					subdirectory.RootPath = self.RootPath
-					subdirectory.FilePattern = self.FilePattern
-					subdirectory.NoRecurseDirectories = self.NoRecurseDirectories
-					subdirectory.FileMinimumSize = self.FileMinimumSize
-					subdirectory.FollowSymlinks = self.FollowSymlinks
-					subdirectory.DeepScan = self.DeepScan
-					subdirectory.CurrentPass = self.CurrentPass
-					subdirectory.PassesDone = self.PassesDone
 					subdirectory.compiledIgnoreList = self.compiledIgnoreList
+					subdirectory.CurrentPass = self.CurrentPass
+					subdirectory.DeepScan = self.DeepScan
+					subdirectory.FileMinimumSize = self.FileMinimumSize
+					subdirectory.FilePattern = self.FilePattern
+					subdirectory.FollowSymlinks = self.FollowSymlinks
+					subdirectory.ID = self.ID
+					subdirectory.NoRecurseDirectories = self.NoRecurseDirectories
+					subdirectory.Parent = dirEntry.ID
+					subdirectory.PassesDone = self.PassesDone
+					subdirectory.Path = absPath
+					subdirectory.RootPath = self.RootPath
 
 					if err := subdirectory.Initialize(); err == nil {
+						if len(self.TargetSubgroups) > 0 {
+							if !sliceutil.ContainsString(self.TargetSubgroups, subdirectory.Parent) {
+								// log.Debugf("PASS %d: Skipping group %s [%s]", self.CurrentPass, subdirectory.Path, subdirectory.Parent)
+								return nil
+							}
+						}
+
 						log.Infof("PASS %d: [%s] %16s: Scanning subdirectory %s", self.CurrentPass, self.ID, subdirectory.Parent, relPath)
 
-						if err := subdirectory.Scan(); err == nil {
+						if err := subdirectory.Scan(self.TargetSubgroups); err == nil {
 							self.FileCount = subdirectory.FileCount
 							self.ModifiedFileCount += subdirectory.ModifiedFileCount
 						} else {

@@ -317,6 +317,10 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 	for _, pass := range passes {
 		if groups, err := self.GroupLister(); err == nil {
 			for _, group := range groups {
+				// will contain a list of IDs of groups underneath this top-level group
+				// that should be scanned
+				subgroups := make([]string, 0)
+
 				if sliceutil.ContainsString(groupsToSkipOnNextPass, group.ID) {
 					continue
 				}
@@ -335,22 +339,30 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 					skip := true
 
 					for _, label := range labels {
+						parts := strings.SplitN(label, `:`, 2)
+						label = parts[0]
+
 						if group.ID == stringutil.Underscore(label) {
 							skip = false
+
+							if len(parts) == 2 {
+								subgroups = strings.Split(parts[1], `,`)
+							}
+
 							break
 						}
 					}
 
 					if skip {
-						log.Debugf("PASS %d: Skipping group %s [%s]", pass, group.Path, group.ID)
+						// log.Debugf("PASS %d: Skipping group %s [%s]", pass, group.Path, group.ID)
 						continue
 					}
 				}
 
 				if err := group.Initialize(); err == nil {
-					log.Debugf("PASS %d: Scanning group %s [%s]", pass, group.Path, group.ID)
+					log.Debugf("PASS %d: Scanning group %s (%d subgroups) [%s]", pass, group.Path, len(subgroups), group.ID)
 
-					if err := group.Scan(); err == nil {
+					if err := group.Scan(subgroups); err == nil {
 						defer group.RefreshStats()
 					} else {
 						if len(groups) == 1 {
