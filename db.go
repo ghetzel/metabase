@@ -163,7 +163,6 @@ func (self *DB) Initialize() error {
 	filter.CriteriaSeparator = `;`
 	filter.FieldTermSeparator = `=`
 	filter.QueryUnescapeValues = true
-	backends.BleveBatchFlushCount = SearchIndexFlushEveryNRecords
 
 	// reuse the "json:" struct tag for loading pivot/dal.Record into/out of structs
 	dal.RecordStructTag = `json`
@@ -283,6 +282,13 @@ func (self *DB) AddGlobalExclusions(patterns ...string) {
 }
 
 func (self *DB) Scan(deep bool, labels ...string) error {
+	oldcount := backends.BleveBatchFlushCount
+	backends.BleveBatchFlushCount = SearchIndexFlushEveryNRecords
+
+	defer func() {
+		backends.BleveBatchFlushCount = oldcount
+	}()
+
 	startedAt := time.Now()
 
 	if self.ScanInProgress {
