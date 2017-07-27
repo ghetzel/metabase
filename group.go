@@ -450,6 +450,9 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 
 	if isDir {
 		entry.ChildCount = self.FileCount
+		entry.Type = `directory`
+	} else {
+		entry.Type = metadata.GetGeneralFileType(name)
 	}
 
 	tm := stats.NewTiming()

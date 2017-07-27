@@ -15,6 +15,35 @@ var FileModeFlags = map[string]os.FileMode{
 	`character`: os.ModeCharDevice,
 }
 
+func GetGeneralFileType(filename string) string {
+	if mediaType, _, err := mime.ParseMediaType(mime.TypeByExtension(filepath.Ext(filename))); err == nil {
+		var major, minor string
+
+		if parts := strings.SplitN(mediaType, `/`, 2); len(parts) == 2 {
+			major = parts[0]
+			minor = parts[1]
+		}
+
+		switch major {
+		case `audio`:
+			return `audio`
+		case `video`:
+			return `video`
+		case `image`:
+			return `image`
+		}
+
+		switch minor {
+		case `ecmascript`, `html`, `javascript`, `scriptlet`, `vrml`, `x-c++hdr`, `x-c++src`, `x-chdr`, `x-csrc`,
+			`x-dsrc`, `x-java`, `x-moc`, `x-pascal`, `x-perl`, `x-python`, `x-ruby`, `x-sh`, `x-sql`, `x-tcl`,
+			`x-tex-pk`, `x-tex`, `x-vrml`:
+			return `code`
+		}
+	}
+
+	return `file`
+}
+
 type FileLoader struct {
 	Loader
 }

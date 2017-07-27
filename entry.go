@@ -30,6 +30,7 @@ var MaxChildEntries = 10000
 type Entry struct {
 	ID              string                 `json:"id"`
 	RelativePath    string                 `json:"name"`
+	Type            string                 `json:"type"`
 	Parent          string                 `json:"parent,omitempty"`
 	Checksum        string                 `json:"checksum,omitempty"`
 	Size            int64                  `json:"size,omitempty"`
