@@ -17,8 +17,8 @@ var MetadataSchema = &dal.Collection{
 			Type:     dal.StringType,
 			Required: true,
 		}, {
-			Name:     `type`,
-			Type:     dal.StringType,
+			Name: `type`,
+			Type: dal.StringType,
 		}, {
 			Name:      `size`,
 			Type:      dal.IntType,

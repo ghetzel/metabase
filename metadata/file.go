@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 var FileModeFlags = map[string]os.FileMode{
@@ -15,8 +16,14 @@ var FileModeFlags = map[string]os.FileMode{
 	`character`: os.ModeCharDevice,
 }
 
+var initMime sync.Once
+
 func GetGeneralFileType(filename string) string {
-	if mediaType, _, err := mime.ParseMediaType(mime.TypeByExtension(filepath.Ext(filename))); err == nil {
+	initMime.Do(func() {
+		SetupMimeTypes()
+	})
+
+	if mediaType := mime.TypeByExtension(filepath.Ext(filename)); mediaType != `` {
 		var major, minor string
 
 		if parts := strings.SplitN(mediaType, `/`, 2); len(parts) == 2 {
@@ -25,12 +32,8 @@ func GetGeneralFileType(filename string) string {
 		}
 
 		switch major {
-		case `audio`:
-			return `audio`
-		case `video`:
-			return `video`
-		case `image`:
-			return `image`
+		case `audio`, `video`, `image`:
+			return major
 		}
 
 		switch minor {

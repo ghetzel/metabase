@@ -39,7 +39,9 @@ func GetChecksumPass() int {
 }
 
 func GetLoaders() LoaderSet {
-	SetupMimeTypes()
+	initMime.Do(func() {
+		SetupMimeTypes()
+	})
 
 	return LoaderSet{
 		{

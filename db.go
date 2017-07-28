@@ -37,7 +37,7 @@ var DefaultGlobalExclusions = []string{
 var DefaultBaseDirectory = `~/.config/metabase`
 var rootGroupToPath = make(map[string]string)
 var CleanupIterations = 256
-var SearchIndexFlushEveryNRecords = 250
+var SearchIndexFlushEveryNRecords = 1000
 
 type GroupListFunc func() ([]Group, error)
 type PreInitializeFunc func(db *DB) error
@@ -284,9 +284,11 @@ func (self *DB) AddGlobalExclusions(patterns ...string) {
 func (self *DB) Scan(deep bool, labels ...string) error {
 	oldcount := backends.BleveBatchFlushCount
 	backends.BleveBatchFlushCount = SearchIndexFlushEveryNRecords
+	log.Debugf("Index record flush count: %d", backends.BleveBatchFlushCount)
 
 	defer func() {
 		backends.BleveBatchFlushCount = oldcount
+		log.Debugf("Index record flush count reset to %d", backends.BleveBatchFlushCount)
 	}()
 
 	startedAt := time.Now()
