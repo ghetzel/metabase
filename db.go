@@ -48,8 +48,9 @@ type DB struct {
 	BaseDirectory      string                 `json:"base_dir"`
 	AutomigrateModels  bool                   `json:"automigrate"`
 	URI                string                 `json:"uri,omitempty"`
-	MetadataURI        string                 `json:"metadata_uri,omitempty"`
 	Indexer            string                 `json:"indexer,omitempty"`
+	MetadataURI        string                 `json:"metadata_uri,omitempty"`
+	MetadataIndexer    string                 `json:"metadata_indexer,omitempty"`
 	AdditionalIndexers []string               `json:"additional_indexers,omitempty"`
 	GlobalExclusions   []string               `json:"global_exclusions,omitempty"`
 	ScanInProgress     bool                   `json:"scan_in_progress"`
@@ -207,7 +208,7 @@ func (self *DB) Initialize() error {
 
 	if self.MetadataURI != self.URI {
 		if db, err := pivot.NewDatabaseWithOptions(self.MetadataURI, backends.ConnectOptions{
-			Indexer:            self.Indexer,
+			Indexer:            self.MetadataIndexer,
 			AdditionalIndexers: self.AdditionalIndexers,
 		}); err == nil {
 			self.metadataDb = db
