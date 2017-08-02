@@ -1,7 +1,7 @@
 package metabase
 
 import (
-	"github.com/ghetzel/go-stockutil/typeutil"
+	"github.com/ghetzel/go-stockutil/stringutil"
 )
 
 type SyncPolicy struct {
@@ -11,7 +11,7 @@ type SyncPolicy struct {
 
 func (self *SyncPolicy) Compare(field string, value interface{}, other interface{}) bool {
 	// TODO: provide some kind of comparator other than ==
-	if eq, err := typeutil.RelaxedEqual(value, other); err == nil && eq {
+	if eq, err := stringutil.RelaxedEqual(value, other); err == nil && eq {
 		return true
 	}
 

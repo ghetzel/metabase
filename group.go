@@ -35,6 +35,7 @@ type Group struct {
 	ModifiedFileCount    int                    `json:"modified_file_count"`
 	Properties           map[string]interface{} `json:"properties,omitempty"`
 	compiledIgnoreList   *util.GitIgnore
+	parentGroup          *Group
 }
 
 var SkipEntry = errors.New("skip entry")
@@ -195,6 +196,14 @@ func (self *Group) Scan(subgroups []string) error {
 	return nil
 }
 
+func (self *Group) GetAncestors() []string {
+	if self.parentGroup == nil {
+		return []string{self.ID}
+	} else {
+		return append([]string{self.Parent}, self.parentGroup.GetAncestors()...)
+	}
+}
+
 func (self *Group) ScanPath(absPath string, fileStats ...os.FileInfo) error {
 	if fileStat, err := variadicStatPath(absPath, fileStats); err == nil {
 		if realstat, err := self.resolveRealStat(absPath, fileStat); err == nil {
@@ -227,6 +236,14 @@ func (self *Group) ScanPath(absPath string, fileStats ...os.FileInfo) error {
 			if !self.NoRecurseDirectories {
 				subdirectory := new(Group)
 
+				if !self.DeepScan {
+					if self.PassesDone > 0 {
+						if self.hasNotChanged(dirEntry.ID) {
+							return SkipEntry
+						}
+					}
+				}
+
 				if err := PopulateGroup(subdirectory); err == nil {
 					subdirectory.compiledIgnoreList = self.compiledIgnoreList
 					subdirectory.CurrentPass = self.CurrentPass
@@ -237,6 +254,7 @@ func (self *Group) ScanPath(absPath string, fileStats ...os.FileInfo) error {
 					subdirectory.ID = self.ID
 					subdirectory.NoRecurseDirectories = self.NoRecurseDirectories
 					subdirectory.Parent = dirEntry.ID
+					subdirectory.parentGroup = self
 					subdirectory.PassesDone = self.PassesDone
 					subdirectory.Path = absPath
 					subdirectory.RootPath = self.RootPath
@@ -395,6 +413,22 @@ func (self *Group) RefreshStats() error {
 	}
 }
 
+func (self *Group) hasNotChanged(id string) bool {
+	// entry is considered "unchanged" if
+	//   1. we're not doing a multi-pass scan
+	//   2. we're on the first pass
+	//   3. this ID is NOT in the set of changed IDs found in prior passes
+	if self.CurrentPass == 0 {
+		return true
+	} else if self.PassesDone == 0 {
+		return true
+	} else if _, ok := changedEntries[id]; !ok {
+		return true
+	}
+
+	return false
+}
+
 func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, error) {
 	defer stats.NewTiming().Send(`metabase.db.entry.scan_time`, map[string]interface{}{
 		`root_group`: self.ID,
@@ -425,11 +459,8 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 		var existingFile Entry
 
 		if err := Metadata.Get(entry.ID, &existingFile); err == nil {
-			if entry.LastModifiedAt == existingFile.LastModifiedAt {
-				// only actually exit if we're not doing passes or we're on the first pass
-				if self.CurrentPass == 0 || self.PassesDone == 0 {
-					return &existingFile, nil
-				}
+			if entry.LastModifiedAt == existingFile.LastModifiedAt && self.hasNotChanged(entry.ID) {
+				return &existingFile, nil
 			}
 
 			entry.Metadata = existingFile.Metadata
@@ -440,9 +471,15 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 
 	// Deep Scan only from here on...
 	// --------------------------------------------------------------------------------------------
+	log.Noticef("PASS %d: [%s] %16s: Scanning entry %s", self.CurrentPass, self.ID, parent, name)
+
 	self.ModifiedFileCount += 1
 
-	log.Infof("PASS %d: [%s] %16s: Scanning entry %s", self.CurrentPass, self.ID, parent, name)
+	changedEntries[entry.ID] = true
+
+	for _, id := range self.GetAncestors() {
+		changedEntries[id] = true
+	}
 
 	entry.Parent = parent
 	entry.RootGroup = self.ID

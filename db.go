@@ -39,6 +39,8 @@ var rootGroupToPath = make(map[string]string)
 var CleanupIterations = 256
 var SearchIndexFlushEveryNRecords = 1000
 
+var changedEntries map[string]bool
+
 type GroupListFunc func() ([]Group, error)
 type PreInitializeFunc func(db *DB) error
 type PostInitializeFunc func(db *DB, backend backends.Backend) error
@@ -283,6 +285,9 @@ func (self *DB) AddGlobalExclusions(patterns ...string) {
 }
 
 func (self *DB) Scan(deep bool, labels ...string) error {
+	// reset global changeset for this scan
+	changedEntries = make(map[string]bool)
+
 	oldcount := backends.BleveBatchFlushCount
 	backends.BleveBatchFlushCount = SearchIndexFlushEveryNRecords
 	log.Debugf("Index record flush count: %d", backends.BleveBatchFlushCount)
