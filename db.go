@@ -295,6 +295,8 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 	defer func() {
 		backends.BleveBatchFlushCount = oldcount
 		log.Debugf("Index record flush count reset to %d", backends.BleveBatchFlushCount)
+		log.Debugf("Perfoming final backend flush")
+		Metadata.GetBackend().Flush()
 	}()
 
 	startedAt := time.Now()
@@ -403,6 +405,9 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 						log.Errorf("PASS %d:Error scanning group %q: %v", pass, group.ID, err)
 					}
 				}
+
+				log.Debugf("PASS %d: Flushing backend", pass)
+				Metadata.GetBackend().Flush()
 
 				groupPasses[group.ID] = (group.PassesDone + 1)
 			}
