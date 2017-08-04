@@ -19,6 +19,7 @@ import (
 	"github.com/ghetzel/pivot/filter"
 	"github.com/ghetzel/pivot/mapper"
 	"github.com/op/go-logging"
+	"github.com/robfig/cron"
 )
 
 var log = logging.MustGetLogger(`metabase`)
@@ -61,12 +62,14 @@ type DB struct {
 	StatsDatabase      string                 `json:"stats_database"`
 	StatsTags          map[string]interface{} `json:"stats_tags"`
 	GroupLister        GroupListFunc          `json:"-"`
+	ScanInterval       string                 `json:"scan_interval"`
 	PreInitialize      PreInitializeFunc      `json:"-"`
 	PostInitialize     PostInitializeFunc     `json:"-"`
 	db                 backends.Backend
 	metadataDb         backends.Backend
 	models             map[string]mapper.Mapper
 	postscanCallbacks  []PostScanFunc
+	scanSchedule       *cron.Cron
 }
 
 var Instance *DB
@@ -104,8 +107,9 @@ func NewDB() *DB {
 		PostInitialize: func(_ *DB, _ backends.Backend) error {
 			return nil
 		},
-		models:    make(map[string]mapper.Mapper),
-		StatsTags: make(map[string]interface{}),
+		models:       make(map[string]mapper.Mapper),
+		StatsTags:    make(map[string]interface{}),
+		scanSchedule: cron.New(),
 	}
 
 	db.GroupLister = func() ([]Group, error) {
@@ -254,6 +258,24 @@ func (self *DB) Initialize() error {
 
 	if err := self.refreshRootGroupPathCache(); err != nil {
 		return err
+	}
+
+	if self.ScanInterval != `` {
+		if err := self.scanSchedule.AddFunc(self.ScanInterval, func() {
+			self.Scan(false)
+
+			if e := self.scanSchedule.Entries(); len(e) > 0 {
+				log.Debugf("Automatic scan completed. Next scan at %v", e[0].Next)
+			}
+		}); err == nil {
+			self.scanSchedule.Start()
+
+			if e := self.scanSchedule.Entries(); len(e) > 0 {
+				log.Debugf("Automatic scans scheduled. Next scan at %v", e[0].Next)
+			}
+		} else {
+			return err
+		}
 	}
 
 	return nil
