@@ -23,7 +23,7 @@ func Initialize(statsdir string, tags map[string]interface{}) error {
 
 	if StatsdHost != `` {
 		sdopts = append(sdopts, statsd.Address(StatsdHost))
-		log.Noticef("Remote statsd host is: %v", StatsdHost)
+		log.Infof("Remote statsd host is: %v", StatsdHost)
 	} else {
 		sdopts = append(sdopts, statsd.Mute(true))
 	}
@@ -47,6 +47,8 @@ func Initialize(statsdir string, tags map[string]interface{}) error {
 
 			if dataset, err := mobius.OpenDataset(expandedStatsDir); err == nil {
 				StatsDB = dataset
+
+				log.Debugf("Local statistics storage has been enabled")
 				log.Debugf("Statistics database: %v", dataset.GetPath())
 				log.Debugf("Statistics tags:     %v", maputil.Join(basetags, `=`, ` `))
 			} else {
@@ -56,7 +58,7 @@ func Initialize(statsdir string, tags map[string]interface{}) error {
 			return err
 		}
 	} else {
-		log.Noticef("Local statistics storage has been disabled.")
+		log.Debugf("Local statistics storage has been disabled.")
 	}
 
 	return nil

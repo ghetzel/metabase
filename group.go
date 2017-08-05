@@ -267,7 +267,7 @@ func (self *Group) ScanPath(absPath string, fileStats ...os.FileInfo) error {
 							}
 						}
 
-						log.Infof("PASS %d: [%s] %16s: Scanning subdirectory %s", self.CurrentPass, self.ID, subdirectory.Parent, relPath)
+						log.Debugf("PASS %d: [%s] %16s: Scanning subdirectory %s", self.CurrentPass, self.ID, subdirectory.Parent, relPath)
 
 						if err := subdirectory.Scan(self.TargetSubgroups); err == nil {
 							self.FileCount = subdirectory.FileCount
@@ -555,7 +555,7 @@ func (self *Group) resolveRealStat(absPath string, fileStat os.FileInfo) (os.Fil
 			if realpath, err := os.Readlink(absPath); err == nil {
 				if realAbsPath, err := filepath.Abs(path.Join(self.Path, realpath)); err == nil {
 					if realstat, err := os.Stat(realAbsPath); err == nil {
-						log.Infof("[%s] Following symbolic link %s -> %s", self.ID, absPath, realAbsPath)
+						log.Debugf("[%s] Following symbolic link %s -> %s", self.ID, absPath, realAbsPath)
 						return realstat, nil
 					} else {
 						return fileStat, fmt.Errorf("[%s] Error reading target of symbolic link %s: %v", self.ID, realAbsPath, err)
@@ -618,7 +618,7 @@ func (self *Group) cleanupMissingEntries(query interface{}, force bool) error {
 
 			if l := len(entriesToDelete); l > 0 {
 				if err := self.cleanup(entriesToDelete...); err == nil {
-					log.Infof("[%s] Cleaned up %d missing entries", self.ID, l)
+					log.Debugf("[%s] Cleaned up %d missing entries", self.ID, l)
 				} else {
 					log.Warningf("[%s] Failed to cleanup missing entries: %v", self.ID, err)
 				}

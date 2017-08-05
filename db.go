@@ -240,7 +240,7 @@ func (self *DB) Initialize() error {
 
 	if self.AutomigrateModels {
 		for name, model := range self.models {
-			log.Infof("Migrating model %q", name)
+			log.Debugf("Migrating model %q", name)
 
 			if err := model.Migrate(); err != nil {
 				return err
@@ -330,7 +330,7 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 		self.ScanInProgress = true
 
 		defer func() {
-			self.Cleanup(true)
+			self.Cleanup(true, !deep)
 			self.ScanInProgress = false
 
 			for _, fn := range self.postscanCallbacks {
@@ -398,6 +398,8 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 				}
 
 				if err := group.Initialize(); err == nil {
+					log.Infof("Scanning path %s", group.Path)
+
 					log.Debugf("PASS %d: Scanning group %s (%d subgroups) [%s]", pass, group.Path, len(subgroups), group.ID)
 
 					if err := group.Scan(subgroups); err == nil {
@@ -457,7 +459,7 @@ func (self *DB) GetDirectoriesByFile(filename string) []Group {
 	return nil
 }
 
-func (self *DB) Cleanup(skipFileStats bool) error {
+func (self *DB) Cleanup(skipFileStats bool, skipRootGroupPrune bool) error {
 	if !self.ScanInProgress {
 		self.ScanInProgress = true
 
@@ -467,6 +469,7 @@ func (self *DB) Cleanup(skipFileStats bool) error {
 	}
 
 	var ids []string
+	var totalRemoved int
 
 	if groups, err := self.GroupLister(); err == nil {
 		for _, group := range groups {
@@ -482,103 +485,108 @@ func (self *DB) Cleanup(skipFileStats bool) error {
 
 	log.Debugf("Cleaning up...")
 
-	// cleanup files whose parent label no longer exists
-	if f, err := ParseFilter(map[string]interface{}{
-		`root_group`: fmt.Sprintf("not:%s", strings.Join(ids, `|`)),
-	}); err == nil {
-		f.Limit = 0
-		f.Sort = nil
+	if !skipRootGroupPrune {
+		// cleanup files whose parent label no longer exists
+		if f, err := ParseFilter(map[string]interface{}{
+			`root_group`: fmt.Sprintf("not:%s", strings.Join(ids, `|`)),
+		}); err == nil {
+			f.Limit = 0
+			f.Sort = nil
 
-		totalRemoved := 0
-		backend := Metadata.GetBackend()
-		indexer := backend.WithSearch(``)
+			backend := Metadata.GetBackend()
+			indexer := backend.WithSearch(``)
 
-		if i, ok := backend.(backends.Indexer); ok {
-			indexer = i
-		}
-
-		log.Debugf("Cleanup: removing entries associated with deleted root groups")
-
-		if err := indexer.DeleteQuery(MetadataSchema.Name, f); err != nil {
-			log.Warningf("Remove missing root_groups failed: %v", err)
-		}
-
-		deleteFn := func(ids []interface{}) int {
-			if l := len(ids); l > 0 {
-				if err := Metadata.Delete(ids...); err == nil {
-					log.Debugf("Removed %d entries", l)
-					return l
-				} else {
-					log.Warningf("Error cleaning up database: %v", err)
-				}
+			if i, ok := backend.(backends.Indexer); ok {
+				indexer = i
 			}
 
-			return 0
+			log.Debugf("Cleanup: removing entries associated with deleted root groups")
+
+			if err := indexer.DeleteQuery(MetadataSchema.Name, f); err != nil {
+				log.Warningf("Remove missing root_groups failed: %v", err)
+			}
+		} else {
+			log.Errorf("Cleanup failed: %v", err)
+			return err
+		}
+	}
+
+	deleteFn := func(ids []interface{}) int {
+		if l := len(ids); l > 0 {
+			if err := Metadata.Delete(ids...); err == nil {
+				log.Debugf("Removed %d entries", l)
+				return l
+			} else {
+				log.Warningf("Error cleaning up database: %v", err)
+			}
 		}
 
-		cleanupFn := func() int {
-			entriesToDelete := make([]interface{}, 0)
-			allQuery := filter.Copy(&filter.All)
-			allQuery.Fields = []string{`id`, `name`, `root_group`, `parent`}
+		return 0
+	}
 
-			if err := Metadata.FindFunc(allQuery, Entry{}, func(entryI interface{}, err error) {
-				var entry *Entry
+	cleanupFn := func() int {
+		entriesToDelete := make([]interface{}, 0)
+		allQuery := filter.Copy(&filter.All)
+		allQuery.Fields = []string{`id`, `name`, `root_group`, `parent`}
 
-				if len(entriesToDelete) >= 1000 {
-					deleteFn(entriesToDelete)
-					entriesToDelete = nil
-				}
+		if err := Metadata.FindFunc(allQuery, Entry{}, func(entryI interface{}, err error) {
+			var entry *Entry
 
-				if e, ok := entryI.(*Entry); ok {
-					entry = e
-				}
+			if len(entriesToDelete) >= 1000 {
+				deleteFn(entriesToDelete)
+				entriesToDelete = nil
+			}
 
-				if err == nil {
-					// make sure the file actually exists
-					if absPath, err := entry.GetAbsolutePath(); err == nil {
-						if _, err := os.Stat(absPath); os.IsNotExist(err) {
-							entriesToDelete = append(entriesToDelete, entry.ID)
-							reportEntryDeletionStats(entry.RootGroup, entry)
-							return
-						}
-					}
+			if e, ok := entryI.(*Entry); ok {
+				entry = e
+			}
 
-					// make sure the entry's parent exists
-					if entry.Parent != `root` && !Metadata.Exists(entry.Parent) {
+			if err == nil {
+				// make sure the file actually exists
+				if absPath, err := entry.GetAbsolutePath(); err == nil {
+					if _, err := os.Stat(absPath); os.IsNotExist(err) {
 						entriesToDelete = append(entriesToDelete, entry.ID)
 						reportEntryDeletionStats(entry.RootGroup, entry)
 						return
 					}
-				} else {
-					log.Warningf("Error cleaning up database entries: %v", err)
 				}
-			}); err == nil {
-				deleteFn(entriesToDelete)
+
+				// make sure the entry's parent exists
+				if entry.Parent != `root` && !Metadata.Exists(entry.Parent) {
+					entriesToDelete = append(entriesToDelete, entry.ID)
+					reportEntryDeletionStats(entry.RootGroup, entry)
+					return
+				}
 			} else {
-				log.Warningf("Failed to cleanup database: %v", err)
+				log.Warningf("Error cleaning up database entries: %v", err)
 			}
-
-			return -1
+		}); err == nil {
+			deleteFn(entriesToDelete)
+		} else {
+			log.Warningf("Failed to cleanup database: %v", err)
 		}
 
-		if !skipFileStats {
-			// cleanup until there's nothing left, an error occurs, or we've exceeded our CleanupIterations
-			log.Debugf("Cleanup: verifying existence of all files")
+		return -1
+	}
 
-			for i := 0; i < CleanupIterations; i++ {
-				if removed := cleanupFn(); removed > 0 {
-					log.Debugf("Cleanup pass %d: removed %d files", i, removed)
-					totalRemoved += removed
-				} else {
-					break
-				}
+	if !skipFileStats {
+		// cleanup until there's nothing left, an error occurs, or we've exceeded our CleanupIterations
+		log.Debugf("Cleanup: verifying existence of all files")
+
+		for i := 0; i < CleanupIterations; i++ {
+			if removed := cleanupFn(); removed > 0 {
+				log.Debugf("Cleanup pass %d: removed %d files", i, removed)
+				totalRemoved += removed
+			} else {
+				break
 			}
 		}
+	}
 
-		log.Infof("Cleaned up %d entries.", totalRemoved)
+	if totalRemoved == 0 {
+		log.Debugf("Cleaned up %d entries.", totalRemoved)
 	} else {
-		log.Errorf("Cleanup failed: %v", err)
-		return err
+		log.Noticef("Cleaned up %d entries.", totalRemoved)
 	}
 
 	return nil
