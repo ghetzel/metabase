@@ -57,6 +57,7 @@ func GetLoaders() LoaderSet {
 			Checksum: true,
 			Loaders: []Loader{
 				&AudioLoader{},
+				&VideoLoader{},
 			},
 		},
 	}

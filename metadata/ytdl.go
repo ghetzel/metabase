@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ghetzel/go-stockutil/maputil"
+	"github.com/ghetzel/go-stockutil/stringutil"
 )
 
 var DefaultExcludeFields = []string{
@@ -68,11 +69,20 @@ func (self *YTDLLoader) parseInfoFile(name string) (map[string]interface{}, erro
 		rv := make(map[string]interface{})
 
 		if err := json.NewDecoder(file).Decode(&rv); err == nil {
+			var duration interface{}
+
+			if dSecI := maputil.DeepGet(rv, []string{`duration`}, nil); dSecI != nil {
+				if dSec, err := stringutil.ConvertToInteger(dSecI); err == nil {
+					duration = dSec * int64(1000)
+				}
+			}
+
 			output := map[string]interface{}{
 				`media`: map[string]interface{}{
 					`type`:        `web`,
 					`title`:       maputil.DeepGet(rv, []string{`title`}, nil),
 					`description`: maputil.DeepGet(rv, []string{`description`}, nil),
+					`duration`:    duration,
 					`aired`: func() interface{} {
 						if v := maputil.DeepGet(rv, []string{`upload_date`}, nil); v != nil {
 							if vS := fmt.Sprintf("%v", v); len(vS) == 8 {

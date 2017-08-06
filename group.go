@@ -459,8 +459,10 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 		var existingFile Entry
 
 		if err := Metadata.Get(entry.ID, &existingFile); err == nil {
-			if entry.LastModifiedAt == existingFile.LastModifiedAt && self.hasNotChanged(entry.ID) {
-				return &existingFile, nil
+			if !self.DeepScan {
+				if entry.LastModifiedAt == existingFile.LastModifiedAt && self.hasNotChanged(entry.ID) {
+					return &existingFile, nil
+				}
 			}
 
 			entry.Metadata = existingFile.Metadata
