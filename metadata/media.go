@@ -13,54 +13,54 @@ import (
 )
 
 type nfoActor struct {
-	Name  string   `xml:"name" structs:"name"`
-	Roles []string `xml:"role" structs:"roles,omitempty"`
-	Photo string   `xml:"thumb,omitempty" structs:"photo,omitempty"`
+	Name  string   `json:"name"            xml:"name"            structs:"name"`
+	Roles []string `json:"roles"           xml:"role"            structs:"roles,omitempty"`
+	Photo string   `json:"photo,omitempty" xml:"thumb,omitempty" structs:"photo,omitempty"`
 }
 
 type nfoTvShow struct {
 	XMLName   xml.Name   `xml:"tvshow"`
-	Title     string     `xml:"title"`
-	Actors    []nfoActor `xml:"actor,omitempty"`
-	Genres    []string   `xml:"genre,omitempty"`
-	MPAA      string     `xml:"mpaa,omitempty"`
-	Plot      string     `xml:"plot,omitempty"`
-	Premiered string     `xml:"premiered,omitempty"`
-	Rating    float64    `xml:"rating,omitempty"`
-	Studio    string     `xml:"studio,omitempty"`
+	Title     string     `json:"title"               xml:"title"`
+	Actors    []nfoActor `json:"actors,omitempty"    xml:"actor,omitempty"`
+	Genres    []string   `json:"genres,omitempty"    xml:"genre,omitempty"`
+	MPAA      string     `json:"mpaa,omitempty"      xml:"mpaa,omitempty"`
+	Plot      string     `json:"plot,omitempty"      xml:"plot,omitempty"`
+	Premiered string     `json:"premiered,omitempty" xml:"premiered,omitempty"`
+	Rating    float64    `json:"rating,omitempty"    xml:"rating,omitempty"`
+	Studio    string     `json:"studio,omitempty"    xml:"studio,omitempty"`
 }
 
 type nfoEpisodeDetails struct {
 	XMLName        xml.Name   `xml:"episodedetails"`
-	Title          string     `xml:"title"`
-	Actors         []nfoActor `xml:"actor,omitempty"`
-	Aired          string     `xml:"aired,omitempty"`
-	Director       string     `xml:"director,omitempty"`
-	DisplayEpisode string     `xml:"displayepisode,omitempty"`
-	DisplaySeason  string     `xml:"displayseason,omitempty"`
-	Episode        int        `xml:"episode"`
-	ID             int        `xml:"id,omitempty"`
-	Plot           string     `xml:"plot,omitempty"`
-	Rating         float64    `xml:"rating,omitempty"`
-	Runtime        int        `xml:"runtime,omitempty"`
-	Season         int        `xml:"season"`
-	ShowTitle      string     `xml:"showtitle,omitempty"`
-	Thumbnail      string     `xml:"thumb,omitempty"`
-	Watched        bool       `xml:"watched,omitempty"`
+	Title          string     `json:"title"                    xml:"title"`
+	Actors         []nfoActor `json:"actors,omitempty"         xml:"actor,omitempty"`
+	Aired          string     `json:"aired,omitempty"          xml:"aired,omitempty"`
+	Director       string     `json:"director,omitempty"       xml:"director,omitempty"`
+	DisplayEpisode string     `json:"displayepisode,omitempty" xml:"displayepisode,omitempty"`
+	DisplaySeason  string     `json:"displayseason,omitempty"  xml:"displayseason,omitempty"`
+	Episode        int        `json:"episode"                  xml:"episode"`
+	ID             int        `json:"id,omitempty"             xml:"id,omitempty"`
+	Plot           string     `json:"plot,omitempty"           xml:"plot,omitempty"`
+	Rating         float64    `json:"rating,omitempty"         xml:"rating,omitempty"`
+	Runtime        int        `json:"runtime,omitempty"        xml:"runtime,omitempty"`
+	Season         int        `json:"season"                   xml:"season"`
+	ShowTitle      string     `json:"showtitle,omitempty"      xml:"showtitle,omitempty"`
+	Thumbnail      string     `json:"thumb,omitempty"          xml:"thumb,omitempty"`
+	Watched        bool       `json:"watched,omitempty"        xml:"watched,omitempty"`
 }
 
 type nfoMovieDetails struct {
 	XMLName       xml.Name   `xml:"movie"`
-	Title         string     `xml:"title"`
-	Actors        []nfoActor `xml:"actor,omitempty"`
-	Genres        []string   `xml:"genre,omitempty"`
-	ID            int        `xml:"id,omitempty"`
-	MPAA          string     `xml:"mpaa,omitempty"`
-	OriginalTitle string     `xml:"originaltitle,omitempty"`
-	Plot          string     `xml:"plot,omitempty"`
-	Premiered     string     `xml:"aired,omitempty"`
-	Tagline       string     `xml:"tagline"`
-	Director      string     `xml:"director,omitempty"`
+	Title         string     `json:"title"                   xml:"title"`
+	Actors        []nfoActor `json:"actors,omitempty"        xml:"actor,omitempty"`
+	Genres        []string   `json:"genres,omitempty"        xml:"genre,omitempty"`
+	ID            int        `json:"id,omitempty"            xml:"id,omitempty"`
+	MPAA          string     `json:"mpaa,omitempty"          xml:"mpaa,omitempty"`
+	OriginalTitle string     `json:"originaltitle,omitempty" xml:"originaltitle,omitempty"`
+	Plot          string     `json:"plot,omitempty"          xml:"plot,omitempty"`
+	Premiered     string     `json:"aired,omitempty"         xml:"aired,omitempty"`
+	Tagline       string     `json:"tagline"                 xml:"tagline"`
+	Director      string     `json:"director,omitempty"      xml:"director,omitempty"`
 }
 
 type MediaLoader struct {
