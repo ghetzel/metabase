@@ -125,7 +125,7 @@ func (self *Entry) String() string {
 }
 
 func (self *Entry) Children(filterString ...string) ([]*Entry, error) {
-	filterString = append(filterString, fmt.Sprintf("parent=%s", self.ID))
+	filterString = append(filterString, fmt.Sprintf("parent/%s", self.ID))
 
 	if f, err := ParseFilter(sliceutil.CompactString(filterString)); err == nil {
 		f.Limit = MaxChildEntries

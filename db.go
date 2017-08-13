@@ -167,8 +167,6 @@ func (self *DB) RegisterPostScanEvent(fn PostScanFunc) {
 
 // Initialize the DB by opening the underlying database
 func (self *DB) Initialize() error {
-	filter.CriteriaSeparator = `;`
-	filter.FieldTermSeparator = `=`
 	filter.QueryUnescapeValues = true
 
 	// reuse the "json:" struct tag for loading pivot/dal.Record into/out of structs
