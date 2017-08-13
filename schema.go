@@ -1,6 +1,8 @@
 package metabase
 
 import (
+	"time"
+
 	"github.com/ghetzel/pivot/dal"
 )
 
@@ -39,13 +41,14 @@ var MetadataSchema = &dal.Collection{
 			Type:      dal.IntType,
 			Validator: dal.ValidatePositiveOrZeroInteger,
 		}, {
-			Name:      `descendants`,
-			Type:      dal.IntType,
-			Validator: dal.ValidatePositiveOrZeroInteger,
-		}, {
 			Name:     `last_modified_at`,
 			Type:     dal.IntType,
 			Required: true,
+		}, {
+			Name:         `created_at`,
+			Type:         dal.IntType,
+			Required:     true,
+			DefaultValue: time.Now,
 		}, {
 			Name: `metadata`,
 			Type: dal.ObjectType,

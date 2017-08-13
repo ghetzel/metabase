@@ -39,6 +39,7 @@ type Entry struct {
 	ChildCount      int                    `json:"children"`
 	DescendantCount int                    `json:"descendants"`
 	LastModifiedAt  int64                  `json:"last_modified_at,omitempty"`
+	CreatedAt       int64                  `json:"created_at,omitempty"`
 	Metadata        map[string]interface{} `json:"metadata"`
 	InitialPath     string                 `json:"-"`
 	info            os.FileInfo
