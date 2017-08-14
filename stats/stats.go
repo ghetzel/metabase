@@ -1,6 +1,7 @@
 package stats
 
 import (
+	"net/http"
 	"os"
 	"time"
 
@@ -17,6 +18,7 @@ var statsdclient, _ = statsd.New()
 var StatsDB *mobius.Dataset
 var basetags = make(map[string]interface{})
 var LocalStatsEnabled = true
+var Prefix string
 
 func Initialize(statsdir string, tags map[string]interface{}) error {
 	sdopts := make([]statsd.Option, 0)
@@ -62,6 +64,10 @@ func Initialize(statsdir string, tags map[string]interface{}) error {
 	}
 
 	return nil
+}
+
+func NewServer(urlPrefix string) http.Handler {
+	return http.StripPrefix(urlPrefix, mobius.NewServer(StatsDB))
 }
 
 func IsEnabled() bool {
@@ -118,6 +124,8 @@ func metric(name string, tags []map[string]interface{}) *mobius.Metric {
 	if len(outTags) > 0 {
 		name = name + mobius.NameTagsDelimiter + maputil.Join(outTags, `=`, mobius.InlineTagSeparator)
 	}
+
+	name = Prefix + name
 
 	return mobius.NewMetric(name)
 }

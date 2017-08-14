@@ -430,7 +430,7 @@ func (self *Group) hasNotChanged(id string) bool {
 }
 
 func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, error) {
-	defer stats.NewTiming().Send(`metabase.db.entry.scan_time`, map[string]interface{}{
+	defer stats.NewTiming().Send(`metabase.db.entry.scan_time_ms`, map[string]interface{}{
 		`root_group`: self.ID,
 		`directory`:  isDir,
 	})
@@ -501,7 +501,7 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 		return nil, err
 	}
 
-	tm.Send(`metabase.db.entry.metadata_load_time`, map[string]interface{}{
+	tm.Send(`metabase.db.entry.metadata_load_time_ms`, map[string]interface{}{
 		`root_group`: self.ID,
 		`directory`:  isDir,
 	})
@@ -515,7 +515,7 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 				if sum, err := entry.GenerateChecksum(false); err == nil {
 					entry.Checksum = sum
 
-					tm.Send(`metabase.db.entry.checksum_time`, map[string]interface{}{
+					tm.Send(`metabase.db.entry.checksum_time_ms`, map[string]interface{}{
 						`root_group`: self.ID,
 						`directory`:  isDir,
 					})
@@ -541,7 +541,7 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 		return nil, err
 	}
 
-	tm.Send(`metabase.db.entry.persist_time`, map[string]interface{}{
+	tm.Send(`metabase.db.entry.persist_time_ms`, map[string]interface{}{
 		`root_group`: self.ID,
 		`directory`:  isDir,
 	})
