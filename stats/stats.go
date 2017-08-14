@@ -110,6 +110,17 @@ func Gauge(name string, value float64, tags ...map[string]interface{}) {
 	statsdclient.Gauge(m.GetUniqueName(), value)
 }
 
+func Set(name string, value float64, tags ...map[string]interface{}) {
+	m := metric(name, tags)
+	m.MaxSize = 1
+
+	if StatsDB != nil {
+		StatsDB.Write(m.Push(time.Now(), value))
+	}
+
+	statsdclient.Gauge(m.GetUniqueName(), value)
+}
+
 func metric(name string, tags []map[string]interface{}) *mobius.Metric {
 	outTags := basetags
 

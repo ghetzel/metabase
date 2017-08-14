@@ -44,6 +44,7 @@ type Entry struct {
 	InitialPath     string                 `json:"-"`
 	info            os.FileInfo
 	metadataLoaded  bool
+	ancestorIDs     []string
 }
 
 type WalkFunc func(path string, file *Entry, err error) error // {}
@@ -312,4 +313,10 @@ func NormalizeFileName(root string, name string) string {
 	name = `/` + strings.TrimPrefix(name, `/`)
 
 	return name
+}
+
+func CalculateAncestorsFromName(root string, name string) []string {
+	out := make([]string, 0)
+
+	return out
 }
