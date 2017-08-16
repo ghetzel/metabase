@@ -2,6 +2,7 @@ package metabase
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
@@ -20,6 +21,8 @@ import (
 	"github.com/ghetzel/pivot/mapper"
 	"github.com/op/go-logging"
 	"github.com/robfig/cron"
+	"github.com/siddontang/ledisdb/config"
+	"github.com/siddontang/ledisdb/ledis"
 )
 
 var log = logging.MustGetLogger(`metabase`)
@@ -40,7 +43,7 @@ var rootGroupToPath = make(map[string]string)
 var CleanupIterations = 256
 var SearchIndexFlushEveryNRecords = 1000
 
-var changedEntries map[string]bool
+var changedEntries *ledis.DB
 
 type GroupListFunc func() ([]Group, error)
 type PreInitializeFunc func(db *DB) error
@@ -304,7 +307,25 @@ func (self *DB) AddGlobalExclusions(patterns ...string) {
 
 func (self *DB) Scan(deep bool, labels ...string) error {
 	// reset global changeset for this scan
-	changedEntries = make(map[string]bool)
+	if tmpdb, err := ioutil.TempFile(``, `metabase-scan-`); err == nil {
+		defer os.RemoveAll(tmpdb.Name())
+
+		if cfg, err := config.NewConfigWithFile(tmpdb.Name()); err == nil {
+			if conn, err := ledis.Open(cfg); err == nil {
+				if db, err := conn.Select(0); err == nil {
+					changedEntries = db
+				} else {
+					return err
+				}
+			} else {
+				return err
+			}
+		} else {
+			return err
+		}
+	} else {
+		return err
+	}
 
 	oldcount := backends.BleveBatchFlushCount
 	backends.BleveBatchFlushCount = SearchIndexFlushEveryNRecords
