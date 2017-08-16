@@ -13,8 +13,8 @@ import (
 	"github.com/ghetzel/go-stockutil/pathutil"
 	"github.com/ghetzel/go-stockutil/sliceutil"
 	"github.com/ghetzel/metabase/metadata"
-	"github.com/ghetzel/metabase/stats"
 	"github.com/ghetzel/metabase/util"
+	"github.com/ghetzel/mobius"
 )
 
 type Group struct {
@@ -178,8 +178,8 @@ func (self *Group) Scan(subgroups []string) error {
 	self.FileCount = 0
 	self.ModifiedFileCount = 0
 
-	if stats, err := ioutil.ReadDir(self.Path); err == nil {
-		for _, fileStat := range stats {
+	if fileStats, err := ioutil.ReadDir(self.Path); err == nil {
+		for _, fileStat := range fileStats {
 			if err := self.ScanPath(
 				path.Join(self.Path, fileStat.Name()),
 				fileStat,
@@ -374,7 +374,7 @@ func (self *Group) RefreshStats() error {
 			`bool:directory`: `false`,
 		}); err == nil {
 			if v, err := Metadata.Sum(`size`, filesFilter); err == nil {
-				stats.Gauge(`metabase.db.total_bytes`, float64(v), map[string]interface{}{
+				mobius.Gauge(`metabase.db.total_bytes`, float64(v), map[string]interface{}{
 					`root_group`: self.ID,
 				})
 			} else {
@@ -382,7 +382,7 @@ func (self *Group) RefreshStats() error {
 			}
 
 			if v, err := Metadata.Count(filesFilter); err == nil {
-				stats.Gauge(`metabase.db.file_count`, float64(v), map[string]interface{}{
+				mobius.Gauge(`metabase.db.file_count`, float64(v), map[string]interface{}{
 					`root_group`: self.ID,
 				})
 			} else {
@@ -397,7 +397,7 @@ func (self *Group) RefreshStats() error {
 			`bool:directory`: `true`,
 		}); err == nil {
 			if v, err := Metadata.Count(dirFilter); err == nil {
-				stats.Gauge(`metabase.db.directory_count`, float64(v), map[string]interface{}{
+				mobius.Gauge(`metabase.db.directory_count`, float64(v), map[string]interface{}{
 					`root_group`: self.ID,
 				})
 			} else {
@@ -430,12 +430,12 @@ func (self *Group) hasNotChanged(id string) bool {
 }
 
 func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, error) {
-	defer stats.NewTiming().Send(`metabase.db.entry.scan_time_ms`, map[string]interface{}{
+	defer mobius.NewTiming().Send(`metabase.db.entry.scan_time_ms`, map[string]interface{}{
 		`root_group`: self.ID,
 		`directory`:  isDir,
 	})
 
-	stats.Increment(`metabase.db.entry.num_scanned`, map[string]interface{}{
+	mobius.Increment(`metabase.db.entry.num_scanned`, map[string]interface{}{
 		`root_group`: self.ID,
 		`directory`:  isDir,
 	})
@@ -494,7 +494,7 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 		entry.Type = metadata.GetGeneralFileType(name)
 	}
 
-	tm := stats.NewTiming()
+	tm := mobius.NewTiming()
 
 	// load entry metadata
 	if err := entry.LoadMetadata(self.CurrentPass); err != nil {
@@ -506,7 +506,7 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 		`directory`:  isDir,
 	})
 
-	tm = stats.NewTiming()
+	tm = mobius.NewTiming()
 
 	if !entry.IsGroup {
 		if !self.SkipChecksum {
@@ -520,7 +520,7 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 						`directory`:  isDir,
 					})
 
-					tm = stats.NewTiming()
+					tm = mobius.NewTiming()
 
 				} else {
 					return nil, err
@@ -529,7 +529,7 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 		}
 
 		if self.CurrentPass <= 1 {
-			stats.Gauge(`metabase.db.entry.bytes_scanned`, float64(entry.Size), map[string]interface{}{
+			mobius.Gauge(`metabase.db.entry.bytes_scanned`, float64(entry.Size), map[string]interface{}{
 				`root_group`: self.ID,
 				`directory`:  isDir,
 			})
@@ -577,11 +577,11 @@ func (self *Group) resolveRealStat(absPath string, fileStat os.FileInfo) (os.Fil
 }
 
 func reportEntryDeletionStats(parentRootGroup string, entry *Entry) {
-	stats.Gauge(`metabase.db.entry.bytes_removed`, float64(entry.Size), map[string]interface{}{
+	mobius.Gauge(`metabase.db.entry.bytes_removed`, float64(entry.Size), map[string]interface{}{
 		`root_group`: parentRootGroup,
 	})
 
-	stats.Increment(`metabase.db.entry.num_removed`, map[string]interface{}{
+	mobius.Increment(`metabase.db.entry.num_removed`, map[string]interface{}{
 		`root_group`: parentRootGroup,
 	})
 }

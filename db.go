@@ -12,7 +12,7 @@ import (
 	"github.com/ghetzel/go-stockutil/sliceutil"
 	"github.com/ghetzel/go-stockutil/stringutil"
 	"github.com/ghetzel/metabase/metadata"
-	"github.com/ghetzel/metabase/stats"
+	"github.com/ghetzel/mobius"
 	"github.com/ghetzel/pivot"
 	"github.com/ghetzel/pivot/backends"
 	"github.com/ghetzel/pivot/dal"
@@ -184,12 +184,10 @@ func (self *DB) Initialize() error {
 	}
 
 	// setup stats
-	if self.StatsDatabase == `` {
-		stats.LocalStatsEnabled = false
-	}
-
-	if err := stats.Initialize(self.StatsDatabase, self.StatsTags); err != nil {
-		return err
+	if self.StatsDatabase != `` {
+		if err := mobius.Initialize(self.StatsDatabase, self.StatsTags); err != nil {
+			return err
+		}
 	}
 
 	if self.URI == `` {
