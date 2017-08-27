@@ -2,6 +2,7 @@ package metabase
 
 import (
 	"errors"
+	"math"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -209,7 +210,8 @@ func (self *Group) ScanPath(absPath string, fileStats ...os.FileInfo) error {
 		if realstat, err := self.resolveRealStat(absPath, fileStat); err == nil {
 			fileStat = realstat
 		} else {
-			return err
+			log.Warningf("PASS %d: [%s] %v", self.CurrentPass, self.ID, err)
+			return SkipEntry
 		}
 
 		relPath := strings.TrimPrefix(absPath, self.RootPath)
@@ -419,13 +421,10 @@ func (self *Group) hasNotChanged(id string) bool {
 	//   2. we're on the first pass
 	//   3. this ID is NOT in the set of changed IDs found in prior passes
 	if self.CurrentPass == 0 {
-		// log.Debugf("PASS %d: [%s] has not changed because monolithic scan", self.CurrentPass, self.ID)
 		return true
-	} else if self.PassesDone == 0 {
-		// log.Debugf("PASS %d: [%s] has not changed because first pass", self.CurrentPass, self.ID)
+	}else if self.PassesDone == 0 {
 		return true
-	} else if x, err := changedEntries.SKeyExists([]byte(id)); err == nil && x == 1 {
-		// log.Debugf("PASS %d: [%s] has not changed because in changedEntries", self.CurrentPass, self.ID)
+	} else if x, err := changedEntries.SIsMember([]byte(`changed`), []byte(id)); err == nil && x == 0 {
 		return true
 	}
 
@@ -463,12 +462,10 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 
 		if err := Metadata.Get(entry.ID, &existingFile); err == nil {
 			if !self.DeepScan {
-				// log.Debugf("db lma: %v, disk lma: %v", entry.LastModifiedAt, existingFile.LastModifiedAt)
+				absModTimeDiff := math.Abs(float64(entry.LastModifiedAt) - float64(existingFile.LastModifiedAt))
 
-				if entry.LastModifiedAt == existingFile.LastModifiedAt {
-					if self.hasNotChanged(entry.ID) {
-						return &existingFile, nil
-					}
+				if absModTimeDiff < 1e9 && self.hasNotChanged(entry.ID) {
+					return &existingFile, nil
 				}
 			}
 
@@ -480,14 +477,14 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 
 	// Deep Scan only from here on...
 	// --------------------------------------------------------------------------------------------
-	log.Noticef("PASS %d: [%s] %16s: Scanning entry %s", self.CurrentPass, self.ID, parent, name)
+	log.Noticef("PASS %d: [%s] %16s: Scanning entry %v (%s)", self.CurrentPass, self.ID, parent, entry.ID, name)
 
 	self.ModifiedFileCount += 1
 
-	changedEntries.SAdd([]byte(entry.ID))
+	changedEntries.SAdd([]byte(`changed`), []byte(entry.ID))
 
 	for _, id := range self.GetAncestors() {
-		changedEntries.SAdd([]byte(id))
+		changedEntries.SAdd([]byte(`changed`),[]byte(id))
 	}
 
 	entry.Parent = parent
