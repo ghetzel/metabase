@@ -419,10 +419,13 @@ func (self *Group) hasNotChanged(id string) bool {
 	//   2. we're on the first pass
 	//   3. this ID is NOT in the set of changed IDs found in prior passes
 	if self.CurrentPass == 0 {
+		// log.Debugf("PASS %d: [%s] has not changed because monolithic scan", self.CurrentPass, self.ID)
 		return true
 	} else if self.PassesDone == 0 {
+		// log.Debugf("PASS %d: [%s] has not changed because first pass", self.CurrentPass, self.ID)
 		return true
 	} else if x, err := changedEntries.SKeyExists([]byte(id)); err == nil && x == 1 {
+		// log.Debugf("PASS %d: [%s] has not changed because in changedEntries", self.CurrentPass, self.ID)
 		return true
 	}
 
@@ -460,8 +463,12 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 
 		if err := Metadata.Get(entry.ID, &existingFile); err == nil {
 			if !self.DeepScan {
-				if entry.LastModifiedAt == existingFile.LastModifiedAt && self.hasNotChanged(entry.ID) {
-					return &existingFile, nil
+				// log.Debugf("db lma: %v, disk lma: %v", entry.LastModifiedAt, existingFile.LastModifiedAt)
+
+				if entry.LastModifiedAt == existingFile.LastModifiedAt {
+					if self.hasNotChanged(entry.ID) {
+						return &existingFile, nil
+					}
 				}
 			}
 
