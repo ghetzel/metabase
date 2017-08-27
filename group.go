@@ -2,9 +2,9 @@ package metabase
 
 import (
 	"errors"
-	"math"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -422,7 +422,7 @@ func (self *Group) hasNotChanged(id string) bool {
 	//   3. this ID is NOT in the set of changed IDs found in prior passes
 	if self.CurrentPass == 0 {
 		return true
-	}else if self.PassesDone == 0 {
+	} else if self.PassesDone == 0 {
 		return true
 	} else if x, err := changedEntries.SIsMember([]byte(`changed`), []byte(id)); err == nil && x == 0 {
 		return true
@@ -484,7 +484,7 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 	changedEntries.SAdd([]byte(`changed`), []byte(entry.ID))
 
 	for _, id := range self.GetAncestors() {
-		changedEntries.SAdd([]byte(`changed`),[]byte(id))
+		changedEntries.SAdd([]byte(`changed`), []byte(id))
 	}
 
 	entry.Parent = parent
