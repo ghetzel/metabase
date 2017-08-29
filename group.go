@@ -79,7 +79,7 @@ func (self *Group) Initialize() error {
 	return nil
 }
 
-func (self *Group) ContainsPath(absPath string, fileStats ...os.FileInfo) bool {
+func (self *Group) ContainsPath(absPath string) bool {
 	relPath := strings.TrimPrefix(absPath, self.RootPath)
 
 	// perform a simple "does this path start with this directory's path" check before symlink deref
@@ -87,26 +87,24 @@ func (self *Group) ContainsPath(absPath string, fileStats ...os.FileInfo) bool {
 		return false
 	}
 
-	fileStat, err := variadicStatPath(absPath, fileStats)
+	if fileStat, err := os.Stat(absPath); err == nil {
+		if realstat, err := self.resolveRealStat(absPath, fileStat); err == nil {
+			fileStat = realstat
 
-	if err != nil {
-		return false
-	}
+			self.populateIgnoreList()
 
-	if realstat, err := self.resolveRealStat(absPath, fileStat); err == nil {
-		fileStat = realstat
-
-		self.populateIgnoreList()
-
-		// if an ignore list is in effect for this directory, verify our file isn't in it
-		if self.compiledIgnoreList != nil {
-			if !self.compiledIgnoreList.ShouldKeep(relPath, fileStat.Mode().IsDir()) {
-				return false
+			// if an ignore list is in effect for this directory, verify our file isn't in it
+			if self.compiledIgnoreList != nil {
+				if !self.compiledIgnoreList.ShouldKeep(relPath, fileStat.Mode().IsDir()) {
+					return false
+				}
 			}
-		}
 
-		// if we just got though all that, we belong here
-		return true
+			// if we just got though all that, we belong here
+			return true
+		} else {
+			return false
+		}
 	} else {
 		return false
 	}
@@ -180,11 +178,8 @@ func (self *Group) Scan(subgroups []string) error {
 	self.ModifiedFileCount = 0
 
 	if fileStats, err := ioutil.ReadDir(self.Path); err == nil {
-		for _, fileStat := range fileStats {
-			if err := self.ScanPath(
-				path.Join(self.Path, fileStat.Name()),
-				fileStat,
-			); err == SkipEntry {
+		for _, file := range fileStats {
+			if err := self.ScanPath(path.Join(self.Path, file.Name())); err == SkipEntry {
 				continue
 			} else if err != nil {
 				return err
@@ -205,8 +200,8 @@ func (self *Group) GetAncestors() []string {
 	}
 }
 
-func (self *Group) ScanPath(absPath string, fileStats ...os.FileInfo) error {
-	if fileStat, err := variadicStatPath(absPath, fileStats); err == nil {
+func (self *Group) ScanPath(absPath string) error {
+	if fileStat, err := os.Stat(absPath); err == nil {
 		if realstat, err := self.resolveRealStat(absPath, fileStat); err == nil {
 			fileStat = realstat
 		} else {
@@ -225,7 +220,7 @@ func (self *Group) ScanPath(absPath string, fileStats ...os.FileInfo) error {
 
 		dirEntry := NewEntry(self.ID, self.RootPath, absPath)
 
-		if !self.ContainsPath(absPath, fileStat) {
+		if !self.ContainsPath(absPath) {
 			log.Debugf("PASS %d: [%s] Ignoring entry %s", self.CurrentPass, self.ID, relPath)
 			self.cleanupMissingEntriesUnderParent(dirEntry.ID, true)
 			self.cleanupMissingEntries(map[string]interface{}{`id`: dirEntry.ID}, true)
@@ -652,16 +647,4 @@ func (self *Group) cleanup(entries ...interface{}) error {
 	} else {
 		return err
 	}
-}
-
-func variadicStatPath(absPath string, fileStats []os.FileInfo) (os.FileInfo, error) {
-	if len(fileStats) == 0 {
-		if stat, err := os.Stat(absPath); err == nil {
-			fileStats = append(fileStats, stat)
-		} else {
-			return nil, err
-		}
-	}
-
-	return fileStats[0], nil
 }
