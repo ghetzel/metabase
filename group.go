@@ -417,6 +417,8 @@ func (self *Group) hasNotChanged(id string) bool {
 	//   3. this ID is NOT in the set of changed IDs found in prior passes
 	if self.CurrentPass == 0 {
 		return true
+	} else if self.PassesDone == 0 {
+		return true
 	} else if x, err := changedEntries.SIsMember([]byte(`changed`), []byte(id)); err == nil && x == 0 {
 		return true
 	}
