@@ -344,6 +344,7 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 		log.Warningf("Another scan is already running")
 		return fmt.Errorf("Scan already running")
 	} else {
+		log.Infof("Scan started at %v", startedAt)
 		self.ScanInProgress = true
 
 		defer func() {
