@@ -370,9 +370,9 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 	groupsToSkipOnNextPass := make([]string, 0)
 	groupPasses := make(map[string]int)
 
-	for _, pass := range passes {
-		if groups, err := self.GroupLister(); err == nil {
-			for _, group := range groups {
+	if groups, err := self.GroupLister(); err == nil {
+		for _, group := range groups {
+			for _, pass := range passes {
 				// will contain a list of IDs of groups underneath this top-level group
 				// that should be scanned
 				subgroups := make([]string, 0)
@@ -453,9 +453,9 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 
 				groupPasses[group.ID] = (group.PassesDone + 1)
 			}
-		} else {
-			return err
 		}
+	} else {
+		return err
 	}
 
 	return nil
