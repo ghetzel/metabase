@@ -12,6 +12,7 @@ type Loader interface {
 type LoaderGroup struct {
 	Pass     int
 	Checksum bool
+	Finalize bool
 	Loaders  []Loader
 }
 
@@ -59,6 +60,9 @@ func GetLoaders() LoaderSet {
 				&AudioLoader{},
 				&VideoLoader{},
 			},
+		}, {
+			Pass:     3,
+			Finalize: true,
 		},
 	}
 }
@@ -87,4 +91,16 @@ func GetLoadersForFile(name string, pass int) []Loader {
 	}
 
 	return loaders
+}
+
+func IsFinalizePass(pass int) bool {
+	for _, group := range GetLoaders() {
+		if group.Pass == pass {
+			if group.Finalize {
+				return true
+			}
+		}
+	}
+
+	return false
 }

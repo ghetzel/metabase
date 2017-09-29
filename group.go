@@ -41,6 +41,7 @@ type Group struct {
 
 var SkipEntry = errors.New("skip entry")
 var RootGroupName = `root`
+var MaxTimeBetweenDeepScans = time.Duration(0)
 
 type WalkEntryFunc func(entry *Entry, isNew bool) error // {}
 type PopulateGroupFunc func(group *Group) error         // {}
@@ -457,10 +458,13 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 
 		if err := Metadata.Get(entry.ID, &existingFile); err == nil {
 			if !self.DeepScan {
-				absModTimeDiff := math.Abs(float64(entry.LastModifiedAt) - float64(existingFile.LastModifiedAt))
+				// trigger a deep scan if the data is considered stale
+				if MaxTimeBetweenDeepScans > 0 && time.Since(time.Unix(0, entry.LastDeepScannedAt)) < MaxTimeBetweenDeepScans {
+					absModTimeDiff := math.Abs(float64(entry.LastModifiedAt) - float64(existingFile.LastModifiedAt))
 
-				if absModTimeDiff < 1e9 && self.hasNotChanged(entry.ID) {
-					return &existingFile, nil
+					if absModTimeDiff < 1e9 && self.hasNotChanged(entry.ID) {
+						return &existingFile, nil
+					}
 				}
 			}
 

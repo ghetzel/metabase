@@ -28,23 +28,24 @@ var MetadataEncoding = base32.NewEncoding(`abcdefghijklmnopqrstuvwxyz234567`)
 var MaxChildEntries = 10000
 
 type Entry struct {
-	ID              string                 `json:"id"`
-	RelativePath    string                 `json:"name"`
-	Type            string                 `json:"type"`
-	Parent          string                 `json:"parent,omitempty"`
-	Checksum        string                 `json:"checksum,omitempty"`
-	Size            int64                  `json:"size,omitempty"`
-	RootGroup       string                 `json:"root_group"`
-	IsGroup         bool                   `json:"group"`
-	ChildCount      int                    `json:"children"`
-	DescendantCount int                    `json:"descendants"`
-	LastModifiedAt  int64                  `json:"last_modified_at,omitempty"`
-	CreatedAt       int64                  `json:"created_at,omitempty"`
-	Metadata        map[string]interface{} `json:"metadata"`
-	InitialPath     string                 `json:"-"`
-	info            os.FileInfo
-	metadataLoaded  bool
-	ancestorIDs     []string
+	ID                string                 `json:"id"`
+	RelativePath      string                 `json:"name"`
+	Type              string                 `json:"type"`
+	Parent            string                 `json:"parent,omitempty"`
+	Checksum          string                 `json:"checksum,omitempty"`
+	Size              int64                  `json:"size,omitempty"`
+	RootGroup         string                 `json:"root_group"`
+	IsGroup           bool                   `json:"group"`
+	ChildCount        int                    `json:"children"`
+	DescendantCount   int                    `json:"descendants"`
+	LastModifiedAt    int64                  `json:"last_modified_at,omitempty"`
+	LastDeepScannedAt int64                  `json:"last_deep_scanned_at,omitempty"`
+	CreatedAt         int64                  `json:"created_at,omitempty"`
+	Metadata          map[string]interface{} `json:"metadata"`
+	InitialPath       string                 `json:"-"`
+	info              os.FileInfo
+	metadataLoaded    bool
+	ancestorIDs       []string
 }
 
 type WalkFunc func(path string, file *Entry, err error) error // {}
@@ -107,6 +108,11 @@ func (self *Entry) LoadMetadata(pass int) error {
 				}
 			} else {
 				return err
+			}
+
+			// if we made it to the finalize pass, update the deep scan timestamp
+			if metadata.IsFinalizePass(pass) {
+				self.LastDeepScannedAt = time.Now().UnixNano()
 			}
 		} else {
 			log.Warningf("%T on %q: %v", loader, self.InitialPath, err)
