@@ -315,16 +315,16 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 				if db, err := conn.Select(0); err == nil {
 					changedEntries = db
 				} else {
-					return err
+					return fmt.Errorf("failed to access changeset: %v", err)
 				}
 			} else {
-				return err
+				return fmt.Errorf("failed to open changeset: %v", err)
 			}
 		} else {
-			return err
+			return fmt.Errorf("failed to setup new changeset: %v", err)
 		}
 	} else {
-		return err
+		return fmt.Errorf("failed to create tempfile: %v", err)
 	}
 
 	oldcount := backends.BleveBatchFlushCount
@@ -455,7 +455,7 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 			}
 		}
 	} else {
-		return err
+		return fmt.Errorf("failed to list groups: %v", err)
 	}
 
 	return nil
