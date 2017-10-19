@@ -62,6 +62,7 @@ type DB struct {
 	ScanInProgress     bool                   `json:"scan_in_progress"`
 	ExtractFields      []string               `json:"extract_fields,omitempty"`
 	SkipMigrate        bool                   `json:"skip_migrate"`
+	SkipChecksum       bool                   `json:"skip_checksum"`
 	StatsDatabase      string                 `json:"stats_database"`
 	StatsTags          map[string]interface{} `json:"stats_tags"`
 	GroupLister        GroupListFunc          `json:"-"`
@@ -261,7 +262,9 @@ func (self *DB) Initialize() error {
 
 	if self.ScanInterval != `` {
 		if err := self.scanSchedule.AddFunc(self.ScanInterval, func() {
-			self.Scan(false)
+			if err := self.Scan(false); err != nil {
+				log.Warningf("Automatic scan error: %v", err)
+			}
 
 			if e := self.scanSchedule.Entries(); len(e) > 0 {
 				log.Debugf("Automatic scan completed. Next scan at %v", e[0].Next)
@@ -372,6 +375,8 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 
 	if groups, err := self.GroupLister(); err == nil {
 		for _, group := range groups {
+			group.db = self
+
 			for _, pass := range passes {
 				// will contain a list of IDs of groups underneath this top-level group
 				// that should be scanned

@@ -37,6 +37,7 @@ type Group struct {
 	Properties           map[string]interface{} `json:"properties,omitempty"`
 	compiledIgnoreList   *util.GitIgnore
 	parentGroup          *Group
+	db                   *DB
 }
 
 var SkipEntry = errors.New("skip entry")
@@ -245,6 +246,7 @@ func (self *Group) ScanPath(absPath string) error {
 				if err := PopulateGroup(subdirectory); err == nil {
 					subdirectory.compiledIgnoreList = self.compiledIgnoreList
 					subdirectory.CurrentPass = self.CurrentPass
+					subdirectory.db = self.db
 					subdirectory.DeepScan = self.DeepScan
 					subdirectory.FileMinimumSize = self.FileMinimumSize
 					subdirectory.FilePattern = self.FilePattern
@@ -428,6 +430,10 @@ func (self *Group) hasNotChanged(id string) bool {
 }
 
 func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, error) {
+	if self.db == nil {
+		return nil, fmt.Errorf("Database instance is required to scan a group")
+	}
+
 	defer mobius.NewTiming().Send(`metabase.db.entry.scan_time_ms`, map[string]interface{}{
 		`root_group`: self.ID,
 		`directory`:  isDir,
@@ -512,7 +518,7 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 	tm = mobius.NewTiming()
 
 	if !entry.IsGroup {
-		if !self.SkipChecksum {
+		if !self.SkipChecksum && !self.db.SkipChecksum {
 			if self.CurrentPass == 0 || self.CurrentPass == metadata.GetChecksumPass() {
 				// calculate checksum for entry
 				if sum, err := entry.GenerateChecksum(false); err == nil {
