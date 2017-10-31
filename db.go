@@ -2,10 +2,10 @@ package metabase
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ghetzel/byteflood/util"
@@ -21,8 +21,6 @@ import (
 	"github.com/ghetzel/pivot/mapper"
 	"github.com/op/go-logging"
 	"github.com/robfig/cron"
-	"github.com/siddontang/ledisdb/config"
-	"github.com/siddontang/ledisdb/ledis"
 )
 
 var log = logging.MustGetLogger(`metabase`)
@@ -43,7 +41,7 @@ var rootGroupToPath = make(map[string]string)
 var CleanupIterations = 256
 var SearchIndexFlushEveryNRecords = 1000
 
-var changedEntries *ledis.DB
+var changedEntries sync.Map
 
 type GroupListFunc func() ([]Group, error)
 type PreInitializeFunc func(db *DB) error
@@ -309,26 +307,7 @@ func (self *DB) AddGlobalExclusions(patterns ...string) {
 }
 
 func (self *DB) Scan(deep bool, labels ...string) error {
-	// reset global changeset for this scan
-	if tmpdb, err := ioutil.TempFile(``, `metabase-scan-`); err == nil {
-		defer os.RemoveAll(tmpdb.Name())
-
-		if cfg, err := config.NewConfigWithFile(tmpdb.Name()); err == nil {
-			if conn, err := ledis.Open(cfg); err == nil {
-				if db, err := conn.Select(0); err == nil {
-					changedEntries = db
-				} else {
-					return fmt.Errorf("failed to access changeset: %v", err)
-				}
-			} else {
-				return fmt.Errorf("failed to open changeset: %v", err)
-			}
-		} else {
-			return fmt.Errorf("failed to setup new changeset: %v", err)
-		}
-	} else {
-		return fmt.Errorf("failed to create tempfile: %v", err)
-	}
+	changedEntries = sync.Map{}
 
 	oldcount := backends.BleveBatchFlushCount
 	backends.BleveBatchFlushCount = SearchIndexFlushEveryNRecords

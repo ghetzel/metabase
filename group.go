@@ -422,7 +422,7 @@ func (self *Group) hasNotChanged(id string) bool {
 		return true
 	} else if self.PassesDone == 0 {
 		return true
-	} else if x, err := changedEntries.SIsMember([]byte(`changed`), []byte(id)); err == nil && x == 0 {
+	} else if _, ok := changedEntries.Load(id); ok {
 		return true
 	}
 
@@ -486,10 +486,10 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 
 	self.ModifiedFileCount += 1
 
-	changedEntries.SAdd([]byte(`changed`), []byte(entry.ID))
+	changedEntries.Store(entry.ID, true)
 
 	for _, id := range self.GetAncestors() {
-		changedEntries.SAdd([]byte(`changed`), []byte(id))
+		changedEntries.Store(id, true)
 	}
 
 	entry.Parent = parent
