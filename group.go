@@ -422,11 +422,17 @@ func (self *Group) hasNotChanged(id string) bool {
 		return true
 	} else if self.PassesDone == 0 {
 		return true
-	} else if _, ok := changedEntries.Load(id); ok {
+	} else {
+		if _, ok := changedEntries.Load(id); ok {
+			for _, aid := range self.GetAncestors() {
+				if _, ok := changedEntries.Load(aid); !ok {
+					return false
+				}
+			}
+		}
+
 		return true
 	}
-
-	return false
 }
 
 func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, error) {
