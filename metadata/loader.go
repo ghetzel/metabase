@@ -56,13 +56,11 @@ func GetLoaders() LoaderSet {
 		}, {
 			Pass:     2,
 			Checksum: true,
+			Finalize: true,
 			Loaders: []Loader{
 				&AudioLoader{},
 				&VideoLoader{},
 			},
-		}, {
-			Pass:     3,
-			Finalize: true,
 		},
 	}
 }
