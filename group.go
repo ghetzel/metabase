@@ -470,7 +470,7 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 		var existingFile Entry
 
 		if err := Metadata.Get(entry.ID, &existingFile); err == nil {
-			if !self.DeepScan {
+			if !self.DeepScan && entry.LastDeepScannedAt > 0 {
 				// trigger a deep scan if the data is considered stale
 				if MaxTimeBetweenDeepScans == 0 || time.Since(time.Unix(0, entry.LastDeepScannedAt)) < MaxTimeBetweenDeepScans {
 					absModTimeDiff := math.Abs(float64(entry.LastModifiedAt) - float64(existingFile.LastModifiedAt))
