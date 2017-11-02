@@ -109,11 +109,6 @@ func (self *Entry) LoadMetadata(pass int) error {
 			} else {
 				return err
 			}
-
-			// if we made it to the finalize pass, update the deep scan timestamp
-			if metadata.IsFinalizePass(pass) {
-				self.LastDeepScannedAt = time.Now().UnixNano()
-			}
 		} else {
 			log.Warningf("%T on %q: %v", loader, self.InitialPath, err)
 		}

@@ -502,6 +502,7 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 	entry.Parent = parent
 	entry.RootGroup = self.ID
 	entry.IsGroup = isDir
+	entry.LastDeepScannedAt = time.Now().UnixNano()
 
 	if isDir {
 		entry.ChildCount = self.FileCount
