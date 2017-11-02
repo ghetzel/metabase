@@ -422,17 +422,11 @@ func (self *Group) hasNotChanged(id string) bool {
 		return true
 	} else if self.PassesDone == 0 {
 		return true
-	} else {
-		if _, ok := changedEntries.Load(id); ok {
-			for _, aid := range self.GetAncestors() {
-				if _, ok := changedEntries.Load(aid); !ok {
-					return false
-				}
-			}
-		}
-
+	} else if _, ok := changedEntries.Load(id); ok {
 		return true
 	}
+
+	return false
 }
 
 func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, error) {
@@ -470,6 +464,11 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 
 		if err := Metadata.Get(entry.ID, &existingFile); err == nil {
 			if !self.DeepScan {
+				// if we're on a subsequent pass, but this entry was not modified, skip it
+				if self.CurrentPass > 1 && self.hasNotChanged(entry.ID) {
+					return &existingFile, nil
+				}
+
 				// trigger a deep scan if the data is considered stale
 				if MaxTimeBetweenDeepScans == 0 || time.Since(time.Unix(0, entry.LastDeepScannedAt)) < MaxTimeBetweenDeepScans {
 					absModTimeDiff := math.Abs(float64(entry.LastModifiedAt) - float64(existingFile.LastModifiedAt))

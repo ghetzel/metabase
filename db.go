@@ -307,8 +307,6 @@ func (self *DB) AddGlobalExclusions(patterns ...string) {
 }
 
 func (self *DB) Scan(deep bool, labels ...string) error {
-	changedEntries = sync.Map{}
-
 	oldcount := backends.BleveBatchFlushCount
 	backends.BleveBatchFlushCount = SearchIndexFlushEveryNRecords
 	log.Debugf("Index record flush count: %d", backends.BleveBatchFlushCount)
@@ -354,6 +352,7 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 
 	if groups, err := self.GroupLister(); err == nil {
 		for _, group := range groups {
+			changedEntries = sync.Map{}
 			group.db = self
 
 			for _, pass := range passes {
@@ -418,10 +417,8 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 
 					if !deep {
 						if group.ModifiedFileCount == 0 {
-							if !sliceutil.ContainsString(groupsToSkipOnNextPass, group.ID) {
-								groupsToSkipOnNextPass = append(groupsToSkipOnNextPass, group.ID)
-								log.Debugf("PASS %d: Group %q will not be scanned in remaining passes", pass, group.ID)
-							}
+							log.Debugf("PASS %d: Group %q will not be scanned in remaining passes", pass, group.ID)
+							break
 						}
 					}
 				} else {
