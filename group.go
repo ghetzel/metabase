@@ -452,6 +452,11 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 		return entry, nil
 	}
 
+	// if we're on a subsequent pass, but this entry was not modified, skip it
+	if self.CurrentPass > 1 && self.hasNotChanged(entry.ID) {
+		return &entry, nil
+	}
+
 	if stat, err := os.Stat(name); err == nil {
 		entry.Size = stat.Size()
 		entry.LastModifiedAt = stat.ModTime().UnixNano()
@@ -464,11 +469,6 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 
 		if err := Metadata.Get(entry.ID, &existingFile); err == nil {
 			if !self.DeepScan {
-				// if we're on a subsequent pass, but this entry was not modified, skip it
-				if self.CurrentPass > 1 && self.hasNotChanged(entry.ID) {
-					return &existingFile, nil
-				}
-
 				// trigger a deep scan if the data is considered stale
 				if MaxTimeBetweenDeepScans == 0 || time.Since(time.Unix(0, entry.LastDeepScannedAt)) < MaxTimeBetweenDeepScans {
 					absModTimeDiff := math.Abs(float64(entry.LastModifiedAt) - float64(existingFile.LastModifiedAt))
