@@ -44,9 +44,9 @@ var MetadataSchema = &dal.Collection{
 			Name:     `last_modified_at`,
 			Type:     dal.IntType,
 			Required: true,
-		},  {
-			Name:     `last_deep_scanned_at`,
-			Type:     dal.IntType,
+		}, {
+			Name: `last_deep_scanned_at`,
+			Type: dal.IntType,
 		}, {
 			Name:         `created_at`,
 			Type:         dal.IntType,
