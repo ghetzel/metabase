@@ -453,8 +453,10 @@ func (self *Group) scanEntry(name string, parent string, isDir bool) (*Entry, er
 	}
 
 	// if we're on a subsequent pass, but this entry was not modified, skip it
-	if self.CurrentPass > 1 && changedEntries.Load(entry.ID); !ok {
-		return entry, nil
+	if self.CurrentPass > 1 {
+		if _, ok := changedEntries.Load(entry.ID); !ok {
+			return entry, nil
+		}
 	}
 
 	if stat, err := os.Stat(name); err == nil {
