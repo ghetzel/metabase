@@ -41,6 +41,9 @@ var MetadataSchema = &dal.Collection{
 			Type:      dal.IntType,
 			Validator: dal.ValidatePositiveOrZeroInteger,
 		}, {
+			Name: `descendants`,
+			Type: dal.IntType,
+		}, {
 			Name:     `last_modified_at`,
 			Type:     dal.IntType,
 			Required: true,

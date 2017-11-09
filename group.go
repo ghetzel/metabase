@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ghetzel/go-stockutil/pathutil"
@@ -46,6 +47,7 @@ var MaxTimeBetweenDeepScans = time.Duration(0)
 
 type WalkEntryFunc func(entry *Entry, isNew bool) error // {}
 type PopulateGroupFunc func(group *Group) error         // {}
+var parentPathCache sync.Map
 
 var PopulateGroup = func(group *Group) error {
 	if group.ID == `` && group.Path != `` {
@@ -112,17 +114,17 @@ func (self *Group) ContainsPath(absPath string) bool {
 	}
 }
 
-func (self *Group) GetLatestModifyTime() time.Time {
+func (self *Group) GetLatestModifyTime() (time.Time, error) {
 	if f, err := ParseFilter(map[string]interface{}{
 		`root_group`: self.ID,
 	}); err == nil {
 		if epochNs, err := Metadata.Maximum(`last_modified_at`, f); err == nil {
-			return time.Unix(0, int64(epochNs))
+			return time.Unix(0, int64(epochNs)), nil
 		} else {
-			panic(err.Error())
+			return time.Time{}, err
 		}
 	} else {
-		panic(err.Error())
+		return time.Time{}, err
 	}
 }
 
@@ -133,6 +135,14 @@ func (self *Group) GetParentFromPath(relPath string) (string, error) {
 		parentName = RootGroupName
 	}
 
+	parentsCacheKey := fmt.Sprintf("%v__%v", self.ID, parentName)
+
+	if v, ok := parentPathCache.Load(parentsCacheKey); ok {
+		if vStr, ok := v.(string); ok {
+			return vStr, nil
+		}
+	}
+
 	if f, err := ParseFilter(map[string]interface{}{
 		`root_group`: self.ID,
 		`name`:       fmt.Sprintf("is:%v", parentName),
@@ -141,7 +151,10 @@ func (self *Group) GetParentFromPath(relPath string) (string, error) {
 
 		if err := Metadata.Find(f, &results); err == nil {
 			if l := len(results); l == 1 {
-				return fmt.Sprintf("%v", results[0].ID), nil
+				parentPath := fmt.Sprintf("%v", results[0].ID)
+				parentPathCache.Store(parentsCacheKey, parentPath)
+
+				return parentPath, nil
 			} else {
 				return ``, fmt.Errorf("Failed to get parent ID: expected 1 result, got: %d", l)
 			}
@@ -203,6 +216,14 @@ func (self *Group) GetAncestors() []string {
 }
 
 func (self *Group) ScanPath(absPath string) error {
+	parentsCleanup := make([]string, 0)
+	parentsCleanupForced := make([]string, 0)
+
+	defer func() {
+		self.cleanupMissingEntriesUnderParents(parentsCleanup, false)
+		self.cleanupMissingEntriesUnderParents(parentsCleanupForced, true)
+	}()
+
 	if fileStat, err := os.Stat(absPath); err == nil {
 		if realstat, err := self.resolveRealStat(absPath, fileStat); err == nil {
 			fileStat = realstat
@@ -224,7 +245,7 @@ func (self *Group) ScanPath(absPath string) error {
 
 		if !self.ContainsPath(absPath) {
 			log.Debugf("PASS %d: [%s] Ignoring entry %s", self.CurrentPass, self.ID, relPath)
-			self.cleanupMissingEntriesUnderParent(dirEntry.ID, true)
+			parentsCleanupForced = append(parentsCleanupForced, dirEntry.ID)
 			self.cleanupMissingEntries(map[string]interface{}{`id`: dirEntry.ID}, true)
 			self.cleanupMissingEntries(map[string]interface{}{`id`: self.ID}, true)
 			return SkipEntry
@@ -301,9 +322,7 @@ func (self *Group) ScanPath(absPath string) error {
 					} else {
 						if _, err := self.scanEntry(absPath, parent, true); err == nil {
 							// cleanup entries for whom we are the parent
-							if err := self.cleanupMissingEntriesUnderParent(subdirectory.Parent, false); err != nil {
-								log.Errorf("PASS %d: [%s] Failed to cleanup entries under %s: %v", self.CurrentPass, self.ID, subdirectory.Parent, err)
-							}
+							parentsCleanup = append(parentsCleanup, subdirectory.Parent)
 						} else {
 							return err
 						}
@@ -652,10 +671,14 @@ func (self *Group) cleanupMissingEntries(query interface{}, force bool) error {
 	}
 }
 
-func (self *Group) cleanupMissingEntriesUnderParent(parent string, force bool) error {
+func (self *Group) cleanupMissingEntriesUnderParents(parents []string, force bool) error {
+	if len(parents) == 0 {
+		return nil
+	}
+
 	// cleanup entries for whom we are the parent
 	return self.cleanupMissingEntries(map[string]interface{}{
-		`parent`: parent,
+		`parent`: parents,
 	}, force)
 }
 

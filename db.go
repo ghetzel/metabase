@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -43,7 +44,7 @@ var SearchIndexFlushEveryNRecords = 1000
 
 var changedEntries sync.Map
 
-type GroupListFunc func() ([]Group, error)
+type GroupListFunc func() (GroupSet, error)
 type PreInitializeFunc func(db *DB) error
 type PostInitializeFunc func(db *DB, backend backends.Backend) error
 type PostScanFunc func()
@@ -114,7 +115,7 @@ func NewDB() *DB {
 		scanSchedule: cron.New(),
 	}
 
-	db.GroupLister = func() ([]Group, error) {
+	db.GroupLister = func() (GroupSet, error) {
 		if Metadata == nil {
 			return nil, fmt.Errorf("Cannot list groups: database not initialized")
 		}
@@ -309,6 +310,8 @@ func (self *DB) AddGlobalExclusions(patterns ...string) {
 func (self *DB) Scan(deep bool, labels ...string) error {
 	oldcount := backends.BleveBatchFlushCount
 	backends.BleveBatchFlushCount = SearchIndexFlushEveryNRecords
+	parentPathCache = sync.Map{}
+
 	log.Debugf("Index record flush count: %d", backends.BleveBatchFlushCount)
 
 	defer func() {
@@ -351,6 +354,8 @@ func (self *DB) Scan(deep bool, labels ...string) error {
 	groupPasses := make(map[string]int)
 
 	if groups, err := self.GroupLister(); err == nil {
+		sort.Sort(sort.Reverse(groups))
+
 		for _, group := range groups {
 			changedEntries = sync.Map{}
 			group.db = self
@@ -598,7 +603,7 @@ func (self *DB) PollDirectories() {
 				for _, group := range groups {
 					lastCheckedAt := util.StartedAt
 
-					if tm := group.GetLatestModifyTime(); !tm.IsZero() {
+					if tm, err := group.GetLatestModifyTime(); err == nil && !tm.IsZero() {
 						lastCheckedAt = tm
 					}
 
