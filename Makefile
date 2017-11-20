@@ -16,7 +16,7 @@ fmt:
 	go vet .
 
 test: fmt deps
-	go test .
+	go test ./...
 
 # build: fmt
 # 	go build -o bin/`basename ${PWD}` cli/*.go

@@ -77,9 +77,9 @@ type DB struct {
 
 var Instance *DB
 
-func ParseFilter(spec interface{}, fmtvalues ...interface{}) (filter.Filter, error) {
+func ParseFilter(spec interface{}, fmtvalues ...interface{}) (*filter.Filter, error) {
 	if fmt.Sprintf("%v", spec) == `all` {
-		return filter.All, nil
+		return filter.All(), nil
 	}
 
 	switch spec.(type) {
@@ -94,7 +94,7 @@ func ParseFilter(spec interface{}, fmtvalues ...interface{}) (filter.Filter, err
 			return filter.Parse(fmt.Sprintf("%v", spec))
 		}
 	default:
-		return filter.Filter{}, fmt.Errorf("Invalid argument type %T", spec)
+		return nil, fmt.Errorf("Invalid argument type %T", spec)
 	}
 }
 
@@ -530,7 +530,7 @@ func (self *DB) Cleanup(skipFileStats bool, skipRootGroupPrune bool) error {
 
 	cleanupFn := func() int {
 		entriesToDelete := make([]interface{}, 0)
-		allQuery := filter.Copy(&filter.All)
+		allQuery := filter.All()
 		allQuery.Fields = []string{`id`, `name`, `root_group`, `parent`}
 
 		if err := Metadata.FindFunc(allQuery, Entry{}, func(entryI interface{}, err error) {
