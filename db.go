@@ -489,7 +489,7 @@ func (self *DB) Cleanup(skipFileStats bool, skipRootGroupPrune bool) error {
 
 	log.Debugf("Cleaning up...")
 
-	if !skipRootGroupPrune {
+	if 1 == 2 {
 		// cleanup files whose parent label no longer exists
 		if f, err := ParseFilter(map[string]interface{}{
 			`root_group`: fmt.Sprintf("not:%s", strings.Join(ids, `|`)),
