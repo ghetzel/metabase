@@ -498,7 +498,7 @@ func (self *DB) Cleanup(skipFileStats bool, skipRootGroupPrune bool) error {
 			f.Sort = nil
 
 			backend := Metadata.GetBackend()
-			indexer := backend.WithSearch(``)
+			indexer := backend.WithSearch(MetadataSchema)
 
 			if i, ok := backend.(backends.Indexer); ok {
 				indexer = i
@@ -506,7 +506,7 @@ func (self *DB) Cleanup(skipFileStats bool, skipRootGroupPrune bool) error {
 
 			log.Debugf("Cleanup: removing entries associated with deleted root groups")
 
-			if err := indexer.DeleteQuery(MetadataSchema.Name, f); err != nil {
+			if err := indexer.DeleteQuery(MetadataSchema, f); err != nil {
 				log.Warningf("Remove missing root_groups failed: %v", err)
 			}
 		} else {
